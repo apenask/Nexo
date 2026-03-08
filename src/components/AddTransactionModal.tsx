@@ -30,22 +30,21 @@ function getTodayLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
-function toSafeISOString(dateString: string) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day, 12, 0, 0).toISOString();
-}
-
 function parseLocalDate(dateString: string) {
   const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day, 12, 0, 0);
+  return new Date(year, month - 1, day);
 }
 
-function formatDateInput(dateIsoOrString: string) {
-  if (!dateIsoOrString) return getTodayLocalDateString();
-  const onlyDate = dateIsoOrString.includes("T")
-    ? dateIsoOrString.split("T")[0]
-    : dateIsoOrString;
-  return onlyDate;
+function normalizeDateInput(dateValue?: string) {
+  if (!dateValue) return getTodayLocalDateString();
+  return dateValue.includes("T") ? dateValue.split("T")[0] : dateValue;
+}
+
+function formatDateOnly(dateObj: Date) {
+  const year = dateObj.getFullYear();
+  const month = `${dateObj.getMonth() + 1}`.padStart(2, "0");
+  const day = `${dateObj.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function AddTransactionModal({
@@ -75,7 +74,7 @@ export function AddTransactionModal({
         setType(initialData.type);
         setAmount(initialData.amount.toString());
         setDescription(initialData.description);
-        setDate(formatDateInput(initialData.date));
+        setDate(normalizeDateInput(initialData.date));
         setCategoryId(initialData.categoryId);
         setIsPlanned(initialData.isPlanned || false);
         setCardId(initialData.cardId || "");
@@ -122,32 +121,18 @@ export function AddTransactionModal({
         const d = new Date(
           currentYear,
           currentMonth + i,
-          (selectedCard as any).dueDate,
-          12,
-          0,
-          0
+          (selectedCard as any).dueDate
         );
-
-        const year = d.getFullYear();
-        const month = `${d.getMonth() + 1}`.padStart(2, "0");
-        const day = `${d.getDate()}`.padStart(2, "0");
-        dates.push(`${year}-${month}-${day}`);
+        dates.push(formatDateOnly(d));
       }
     } else {
       for (let i = 0; i < count; i++) {
         const d = new Date(
           currentYear,
           currentMonth + i,
-          baseDate.getDate(),
-          12,
-          0,
-          0
+          baseDate.getDate()
         );
-
-        const year = d.getFullYear();
-        const month = `${d.getMonth() + 1}`.padStart(2, "0");
-        const day = `${d.getDate()}`.padStart(2, "0");
-        dates.push(`${year}-${month}-${day}`);
+        dates.push(formatDateOnly(d));
       }
     }
 
@@ -165,7 +150,7 @@ export function AddTransactionModal({
         type,
         amount: parseFloat(amount),
         description,
-        date: toSafeISOString(date),
+        date, // salva como YYYY-MM-DD
         categoryId,
         isPlanned,
         cardId: cardId || undefined,
@@ -191,7 +176,7 @@ export function AddTransactionModal({
           type,
           amount: installmentAmount,
           description: `${description} (${index + 1}/${count})`,
-          date: toSafeISOString(instDate),
+          date: instDate, // salva como YYYY-MM-DD
           categoryId,
           isPlanned: true,
           cardId: cardId || undefined,
@@ -210,7 +195,7 @@ export function AddTransactionModal({
       type,
       amount: parseFloat(amount),
       description,
-      date: toSafeISOString(date),
+      date, // salva como YYYY-MM-DD
       categoryId,
       isPlanned,
       cardId: cardId || undefined,
