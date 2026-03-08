@@ -60,15 +60,21 @@ export function AddCardModal({ isOpen, onClose, onAdd }: AddCardModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm">
-      <div className="flex min-h-screen items-center justify-center p-3 sm:p-4">
-        <div className="flex h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+      <div
+        className="flex items-center justify-center p-3 sm:p-4"
+        style={{ minHeight: "100dvh" }}
+      >
+        <div
+          className="flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+          style={{ height: "min(92dvh, 820px)" }}
+        >
           <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-4 sm:px-6 sm:py-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-2.5">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-2.5 shrink-0">
                 <CreditCard size={18} className="text-zinc-100" />
               </div>
-              <div>
-                <h2 className="text-base font-semibold text-zinc-100 sm:text-lg">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-zinc-100 sm:text-lg truncate">
                   Novo cartão
                 </h2>
                 <p className="text-xs text-zinc-500 sm:text-sm">
@@ -80,7 +86,7 @@ export function AddCardModal({ isOpen, onClose, onAdd }: AddCardModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-zinc-400 hover:text-zinc-100"
+              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-zinc-400 hover:text-zinc-100 shrink-0"
             >
               <X size={16} />
             </button>
@@ -88,7 +94,7 @@ export function AddCardModal({ isOpen, onClose, onAdd }: AddCardModalProps) {
 
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
-              <div className="space-y-5">
+              <div className="space-y-5 pb-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-300">
                     Nome do cartão
@@ -203,7 +209,10 @@ export function AddCardModal({ isOpen, onClose, onAdd }: AddCardModalProps) {
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-zinc-800 px-4 py-4 sm:px-6">
+            <div
+              className="shrink-0 border-t border-zinc-800 bg-zinc-950 px-4 pt-4 sm:px-6"
+              style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
