@@ -113,7 +113,6 @@ function mapCategory(db: DbCategory): Category {
     id: db.id,
     name: db.name,
     color: db.color ?? "#22c55e",
-    budgetPercentage: Number(db.budget_percentage ?? 0),
   };
 }
 
@@ -467,7 +466,7 @@ export default function App() {
         user_id: session.id,
         name: newCat.name,
         color: newCat.color,
-        budget_percentage: newCat.budgetPercentage ?? 0,
+        budget_percentage: 0,
       };
 
       const { data, error } = await supabase
@@ -491,7 +490,7 @@ export default function App() {
       const payload = {
         name: updatedCategory.name,
         color: updatedCategory.color,
-        budget_percentage: updatedCategory.budgetPercentage ?? 0,
+        budget_percentage: 0,
       };
 
       const { data, error } = await supabase

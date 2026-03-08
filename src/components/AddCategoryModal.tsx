@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Tags, Percent } from "lucide-react";
+import { X, Tags } from "lucide-react";
 import { Category } from "../types";
 
 interface AddCategoryModalProps {
@@ -28,13 +28,11 @@ export function AddCategoryModal({
   onAdd,
   onUpdate,
   initialData,
-  categories = [],
 }: AddCategoryModalProps) {
   const isEditing = Boolean(initialData);
 
   const [name, setName] = React.useState("");
   const [color, setColor] = React.useState("#22c55e");
-  const [budgetPercentage, setBudgetPercentage] = React.useState(0);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -42,24 +40,13 @@ export function AddCategoryModal({
     if (initialData) {
       setName(initialData.name || "");
       setColor(initialData.color || "#22c55e");
-      setBudgetPercentage(Number(initialData.budgetPercentage ?? 0));
     } else {
       setName("");
       setColor("#22c55e");
-      setBudgetPercentage(0);
     }
   }, [isOpen, initialData]);
 
   if (!isOpen) return null;
-
-  const totalOtherPercentages = categories
-    .filter((category) => category.id !== initialData?.id)
-    .reduce((sum, category) => sum + Number(category.budgetPercentage ?? 0), 0);
-
-  const totalWithCurrent = totalOtherPercentages + budgetPercentage;
-  const exceedsLimit = totalWithCurrent > 100;
-  const remaining = Math.max(100 - totalWithCurrent, 0);
-  const overBy = Math.max(totalWithCurrent - 100, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,13 +58,11 @@ export function AddCategoryModal({
         ...initialData,
         name: name.trim(),
         color,
-        budgetPercentage,
       });
     } else {
       onAdd({
         name: name.trim(),
         color,
-        budgetPercentage,
       } as Omit<Category, "id">);
     }
 
@@ -104,7 +89,7 @@ export function AddCategoryModal({
                   {isEditing ? "Editar categoria" : "Nova categoria"}
                 </h2>
                 <p className="text-xs text-zinc-500 sm:text-sm">
-                  Defina nome, cor e porcentagem do orçamento.
+                  Defina apenas o nome e a cor da categoria.
                 </p>
               </div>
             </div>
@@ -157,75 +142,6 @@ export function AddCategoryModal({
                   </div>
                 </div>
 
-                <div className="space-y-4 rounded-3xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-zinc-300">
-                        <Percent size={15} />
-                        <span>Orçamento percentual</span>
-                      </div>
-                      <p className="mt-2 text-3xl font-bold text-zinc-50">
-                        {budgetPercentage}%
-                      </p>
-                    </div>
-
-                    <div
-                      className="h-12 w-12 shrink-0 rounded-2xl border border-white/10"
-                      style={{ backgroundColor: color }}
-                    />
-                  </div>
-
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={budgetPercentage}
-                    onChange={(e) => setBudgetPercentage(Number(e.target.value))}
-                    className="w-full accent-white"
-                  />
-
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span>0%</span>
-                    <span>100%</span>
-                  </div>
-
-                  <div className="rounded-2xl border border-zinc-800 bg-black/20 p-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-zinc-400">Soma total do orçamento</span>
-                      <span
-                        className={`font-semibold ${
-                          exceedsLimit ? "text-rose-400" : "text-zinc-100"
-                        }`}
-                      >
-                        {totalWithCurrent.toFixed(0)}%
-                      </span>
-                    </div>
-
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className={`h-full rounded-full ${
-                          exceedsLimit ? "bg-rose-400" : "bg-zinc-100"
-                        }`}
-                        style={{ width: `${Math.min(totalWithCurrent, 100)}%` }}
-                      />
-                    </div>
-
-                    <div className="mt-3 text-xs">
-                      {exceedsLimit ? (
-                        <p className="text-rose-400">
-                          A soma dos orçamentos ultrapassa 100% em {overBy.toFixed(0)}%.
-                          Ajuste os limites para fechar as contas.
-                        </p>
-                      ) : (
-                        <p className="text-zinc-400">
-                          Ainda restam {remaining.toFixed(0)}% livres no seu planejamento.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
                 <div
                   className="rounded-3xl border border-zinc-800 p-5"
                   style={{
@@ -239,7 +155,7 @@ export function AddCategoryModal({
                     {name || "Nome da categoria"}
                   </h3>
                   <p className="mt-2 text-sm text-zinc-400">
-                    Percentual planejado: {budgetPercentage}%
+                    Os percentuais agora são calculados automaticamente pelos lançamentos.
                   </p>
                 </div>
               </div>
