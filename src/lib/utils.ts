@@ -18,9 +18,21 @@ export function formatCurrency(value: number, currencyCode: string = "BRL"): str
   }).format(value);
 }
 
-export function formatDate(date: Date | string): string {
-  const d = new Date(date);
-  return new Intl.DateTimeFormat("pt-BR", {
+export function parseLocalDate(dateString: string): Date {
+  if (!dateString) return new Date();
+
+  if (dateString.includes("T")) {
+    return new Date(dateString);
+  }
+
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function formatDate(date: Date | string, locale: string = "pt-BR"): string {
+  const d = typeof date === "string" ? parseLocalDate(date) : date;
+
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",

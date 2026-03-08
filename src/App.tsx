@@ -35,6 +35,7 @@ import {
 } from "./types";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { parseLocalDate } from "./lib/utils";
 
 type DbProfile = {
   id: string;
@@ -739,7 +740,7 @@ export default function App() {
         ) {
           const exists = transactions.some((t) => {
             if (t.recurringTransactionId !== rt.id) return false;
-            const tDate = new Date(t.date);
+            const tDate = parseLocalDate(t.date);
 
             if (rt.recurrenceType === "mensal" || rt.recurrenceType === "anual") {
               return (
@@ -773,7 +774,7 @@ export default function App() {
   const allTransactions = useMemo(
     () =>
       [...transactions, ...getProjectedTransactions()].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
       ),
     [transactions, recurringTransactions]
   );
