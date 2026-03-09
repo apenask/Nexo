@@ -71,11 +71,12 @@ export function AdminDashboard() {
       setRecentUsers((recentUsersRes.data ?? []) as RecentUserRow[]);
     }
 
-    const metricsRow = ((metricsRes.data ?? [])[0] as MetricsRow | undefined) ?? {
-      total_users: 0,
-      online_users: 0,
-      offline_users: 0,
-    };
+    const metricsRow: MetricsRow =
+      (metricsRes.data as unknown as MetricsRow) ?? {
+        total_users: 0,
+        online_users: 0,
+        offline_users: 0,
+      };
 
     setMetrics(metricsRow);
     setIsLoading(false);
