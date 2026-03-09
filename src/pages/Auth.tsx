@@ -588,10 +588,6 @@ function SupportModal({
               <Instagram size={16} />
               Criador do projeto
             </div>
-            <p className="mt-1 text-xs leading-5 text-zinc-500">
-              Você pode deixar seu Instagram aqui para reforçar autoria, confiança e contato direto com quem criou o Nexo.
-            </p>
-
             <a
               href={CREATOR_INSTAGRAM_URL}
               target="_blank"
