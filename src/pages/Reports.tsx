@@ -7,7 +7,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { Transaction, Category } from "../types";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, parseLocalDate } from "../lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { MonthSelector } from "../components/MonthSelector";
 import { useProfile } from "../contexts/ProfileContext";
@@ -73,7 +73,7 @@ export function ReportsPage({
   const year = selectedMonth.getFullYear();
 
   const monthTransactions = transactions.filter((tx) => {
-    const d = new Date(tx.date);
+    const d = parseLocalDate(tx.date);
     return d.getMonth() === month && d.getFullYear() === year && !tx.isPlanned;
   });
 

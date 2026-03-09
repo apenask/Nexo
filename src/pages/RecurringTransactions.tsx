@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Plus, Edit2, Pause, Play, Trash2 } from "lucide-react";
 import { RecurringTransaction, Category } from "../types";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, formatDate } from "../lib/utils";
 import { AddRecurringModal } from "../components/AddRecurringModal";
 import { useProfile } from "../contexts/ProfileContext";
 
@@ -79,7 +79,7 @@ export function RecurringTransactionsPage({
                           {getRecurrenceLabel(rt.recurrenceType)}
                         </span>
                         <span>•</span>
-                        <span>Início: {new Date(rt.startDate).toLocaleDateString('pt-BR')}</span>
+                        <span>Início: {formatDate(rt.startDate, "pt-BR")}</span>
                         {rt.status === "paused" && (
                           <>
                             <span>•</span>

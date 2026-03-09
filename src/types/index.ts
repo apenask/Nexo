@@ -5,8 +5,6 @@ export interface Profile {
   last_login: string | null;
   preferred_currency: string;
   role: 'user' | 'admin';
-  isAdmin: boolean;
-  last_seen?: string | null;
 }
 
 export type TransactionType = "entrada" | "saida";

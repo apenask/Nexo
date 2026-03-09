@@ -11,7 +11,7 @@ export function formatCurrency(value: number, currencyCode: string = "BRL"): str
     USD: "en-US",
     EUR: "de-DE",
   };
-
+  
   return new Intl.NumberFormat(locales[currencyCode] || "pt-BR", {
     style: "currency",
     currency: currencyCode,
