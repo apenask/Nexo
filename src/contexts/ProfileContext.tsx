@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabase";
 import { Profile } from "../types";
+import { supabase } from "../lib/supabase";
 
-type CurrencyType = "BRL" | "USD" | "EUR";
+export type CurrencyType = "BRL" | "USD" | "EUR";
 
 interface ProfileContextType {
   profile: Profile | null;
@@ -42,13 +42,17 @@ export function ProfileProvider({ children, initialProfile }: ProfileProviderPro
 
       if (error) throw error;
 
+      const isAdmin = Boolean(data.is_admin) || data.role === "admin";
+
       const mappedProfile: Profile = {
         id: data.id,
         email: data.email ?? "",
         created_at: data.created_at ?? new Date().toISOString(),
         last_login: data.last_login ?? null,
         preferred_currency: data.preferred_currency ?? "BRL",
-        role: data.role ?? "user",
+        role: isAdmin ? "admin" : "user",
+        isAdmin,
+        last_seen: data.last_seen ?? null,
       };
 
       setProfile(mappedProfile);

@@ -1,184 +1,244 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
-import { Users, Activity, UserCheck, UserX, CreditCard, Tags, ArrowRightLeft } from "lucide-react";
+import { Users, UserCheck, UserX, RefreshCw, ShieldAlert } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { useProfile } from "../contexts/ProfileContext";
+import { formatDate } from "../lib/utils";
 
-interface Profile {
+type MetricsRow = {
+  total_users: number;
+  online_users: number;
+  offline_users: number;
+};
+
+type RecentUserRow = {
   id: string;
-  email: string;
-  created_at: string;
+  email: string | null;
+  created_at: string | null;
   last_login: string | null;
-}
+  is_admin: boolean | null;
+  role: string | null;
+  is_online: boolean;
+  presence_last_seen: string | null;
+};
 
 export function AdminDashboard() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [transactionsCount, setTransactionsCount] = useState(0);
-  const [categoriesCount, setCategoriesCount] = useState(0);
-  const [cardsCount, setCardsCount] = useState(0);
+  const { profile } = useProfile();
+  const [metrics, setMetrics] = useState<MetricsRow>({
+    total_users: 0,
+    online_users: 0,
+    offline_users: 0,
+  });
+  const [recentUsers, setRecentUsers] = useState<RecentUserRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAdminData();
+  const loadAdminData = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const syncRes = await supabase.rpc("sync_profiles_from_auth");
+    if (syncRes.error) {
+      console.warn("Não foi possível sincronizar profiles com auth.users:", syncRes.error.message);
+    }
+
+    const [metricsRes, recentUsersRes] = await Promise.all([
+      supabase.rpc("admin_dashboard_metrics"),
+      supabase.rpc("admin_recent_users", { limit_count: 20 }),
+    ]);
+
+    if (metricsRes.error) {
+      setErrorMessage(
+        metricsRes.error.message.includes("permission")
+          ? "Seu banco ainda não liberou o painel admin. Rode o SQL mais recente do pacote e tente novamente."
+          : metricsRes.error.message
+      );
+      setMetrics({ total_users: 0, online_users: 0, offline_users: 0 });
+      setRecentUsers([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (recentUsersRes.error) {
+      setErrorMessage(
+        recentUsersRes.error.message.includes("permission")
+          ? "Seu banco ainda não liberou a listagem admin. Rode o SQL mais recente do pacote e tente novamente."
+          : recentUsersRes.error.message
+      );
+      setRecentUsers([]);
+    } else {
+      setRecentUsers((recentUsersRes.data ?? []) as RecentUserRow[]);
+    }
+
+    const metricsRow = ((metricsRes.data ?? [])[0] as MetricsRow | undefined) ?? {
+      total_users: 0,
+      online_users: 0,
+      offline_users: 0,
+    };
+
+    setMetrics(metricsRow);
+    setIsLoading(false);
   }, []);
 
-  const loadAdminData = async () => {
-    const { data: profilesData } = await supabase.from("profiles").select("*");
-    const { count: txCount } = await supabase.from("transactions").select("*", { count: "exact", head: true });
-    const { count: catCount } = await supabase.from("categories").select("*", { count: "exact", head: true });
-    const { count: cardsCount } = await supabase.from("cards").select("*", { count: "exact", head: true });
+  useEffect(() => {
+    if (!profile?.isAdmin) return;
 
-    if (profilesData) setProfiles(profilesData);
-    if (txCount) setTransactionsCount(txCount);
-    if (catCount) setCategoriesCount(catCount);
-    if (cardsCount) setCardsCount(cardsCount);
-  };
+    loadAdminData();
 
-  const today = new Date();
+    const channel = supabase
+      .channel("admin-live-metrics")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        () => loadAdminData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_presence" },
+        () => loadAdminData()
+      )
+      .subscribe();
 
-  const activeToday = profiles.filter((p) => {
-    if (!p.last_login) return false;
-    const login = new Date(p.last_login);
-    return login.toDateString() === today.toDateString();
-  }).length;
+    const interval = window.setInterval(() => {
+      loadAdminData();
+    }, 10000);
 
-  const active30Days = profiles.filter((p) => {
-    if (!p.last_login) return false;
-    const login = new Date(p.last_login);
-    const diff = today.getTime() - login.getTime();
-    return diff <= 30 * 24 * 60 * 60 * 1000;
-  }).length;
+    return () => {
+      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.isAdmin, loadAdminData]);
 
-  const onlineUsers = profiles.filter((p) => {
-    if (!p.last_login) return false;
-    const login = new Date(p.last_login);
-    const diff = today.getTime() - login.getTime();
-    return diff <= 5 * 60 * 1000;
-  }).length;
+  const onlineCount = useMemo(() => Number(metrics.online_users || 0), [metrics.online_users]);
+  const totalCount = useMemo(() => Number(metrics.total_users || 0), [metrics.total_users]);
+  const offlineCount = useMemo(
+    () => Math.max(Number(metrics.offline_users || 0), totalCount - onlineCount, 0),
+    [metrics.offline_users, totalCount, onlineCount]
+  );
 
-  const offlineUsers = profiles.length - onlineUsers;
+  if (!profile?.isAdmin) {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-50">Admin</h1>
+          <p className="text-zinc-400 mt-1">Acesso restrito.</p>
+        </div>
 
-  const recentUsers = [...profiles]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5);
+        <Card className="bg-zinc-900/40 border-zinc-800/40">
+          <CardContent className="py-8 flex items-center gap-3 text-zinc-300">
+            <ShieldAlert className="text-amber-400" size={18} />
+            Sua conta não possui permissão de administrador.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-50">Dev</h1>
-        <p className="text-zinc-400 mt-1">Métricas e monitoramento do sistema.</p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-50">Admin</h1>
+          <p className="text-zinc-400 mt-1">
+            Acompanhe em tempo quase real quantas contas estão usando a plataforma.
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={loadAdminData}
+          className="border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/60 text-zinc-100"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Atualizar métricas
+        </Button>
       </div>
 
-      {/* Cards principais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <Users size={16} /> Usuários cadastrados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{profiles.length}</p>
-          </CardContent>
+      {errorMessage && (
+        <Card className="bg-rose-950/20 border-rose-900/40">
+          <CardContent className="py-4 text-sm text-rose-200">{errorMessage}</CardContent>
         </Card>
+      )}
 
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <UserCheck size={16} /> Ativos hoje
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{activeToday}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <Activity size={16} /> Ativos 30 dias
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{active30Days}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <UserCheck size={16} /> Online
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{onlineUsers}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <UserX size={16} /> Offline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{offlineUsers}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <ArrowRightLeft size={16} /> Transações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{transactionsCount}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <Tags size={16} /> Categorias
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{categoriesCount}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/40 border-zinc-800/40">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
-              <CreditCard size={16} /> Cartões
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{cardsCount}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard icon={<Users size={16} />} label="Usuários cadastrados" value={totalCount} />
+        <StatCard icon={<UserCheck size={16} />} label="Online agora" value={onlineCount} />
+        <StatCard icon={<UserX size={16} />} label="Offline agora" value={offlineCount} />
       </div>
 
-      {/* Usuários recentes */}
       <Card className="bg-zinc-900/40 border-zinc-800/40">
         <CardHeader>
-          <CardTitle className="text-lg text-zinc-100">Usuários recentes</CardTitle>
+          <CardTitle className="text-lg text-zinc-100">Contas recentes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentUsers.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between border-b border-zinc-800 pb-2"
-              >
-                <span className="text-zinc-300">{user.email}</span>
-                <span className="text-xs text-zinc-500">
-                  {new Date(user.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="text-zinc-400 text-sm">Carregando métricas...</div>
+          ) : recentUsers.length === 0 ? (
+            <div className="text-zinc-400 text-sm">Nenhuma conta encontrada.</div>
+          ) : (
+            <div className="space-y-3">
+              {recentUsers.map((user) => {
+                const isAdmin = Boolean(user.is_admin) || user.role === "admin";
+
+                return (
+                  <div
+                    key={user.id}
+                    className="flex flex-col gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-zinc-100 truncate">{user.email || "Sem e-mail"}</span>
+                        {isAdmin && (
+                          <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                            Admin
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border ${
+                            user.is_online
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
+                              : "bg-zinc-800/70 text-zinc-400 border-zinc-700/60"
+                          }`}
+                        >
+                          {user.is_online ? "Online" : "Offline"}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-zinc-500 break-all">{user.id}</div>
+                    </div>
+
+                    <div className="text-xs text-zinc-400 md:text-right">
+                      <div>Criado em {user.created_at ? formatDate(user.created_at) : "-"}</div>
+                      <div>
+                        Último login {user.last_login ? new Date(user.last_login).toLocaleString("pt-BR") : "-"}
+                      </div>
+                      <div>
+                        Última presença {user.presence_last_seen ? new Date(user.presence_last_seen).toLocaleString("pt-BR") : "-"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <Card className="bg-zinc-900/40 border-zinc-800/40">
+      <CardContent className="p-6">
+        <div className="flex items-center gap-3 mb-4 text-zinc-400">
+          <div className="w-9 h-9 rounded-xl bg-zinc-800/70 border border-zinc-700/60 flex items-center justify-center text-zinc-200">
+            {icon}
+          </div>
+          <span className="text-sm">{label}</span>
+        </div>
+        <div className="text-3xl font-semibold tracking-tight text-zinc-50">{value}</div>
+      </CardContent>
+    </Card>
   );
 }

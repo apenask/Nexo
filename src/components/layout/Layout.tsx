@@ -43,7 +43,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           reports: "Reports",
           settings: "Settings",
           logout: "Sign out",
-          dev: "Dev",
+          dev: "Admin",
         };
       case "es-ES":
         return {
@@ -56,7 +56,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           reports: "Informes",
           settings: "Configuración",
           logout: "Cerrar sesión",
-          dev: "Dev",
+          dev: "Admin",
         };
       case "pt-BR":
       default:
@@ -70,7 +70,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           reports: "Relatórios",
           settings: "Configurações",
           logout: "Sair da conta",
-          dev: "Dev",
+          dev: "Admin",
         };
     }
   }, [language]);
@@ -129,7 +129,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 border-r border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col",
+          "fixed left-0 top-[72px] bottom-0 z-40 w-64 border-r border-zinc-800/50 bg-zinc-950/95 backdrop-blur-xl transform transition-transform duration-300 ease-in-out md:relative md:top-0 md:bottom-auto md:translate-x-0 flex flex-col",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -140,7 +140,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           <span className="font-semibold text-xl tracking-tight">Nexo</span>
         </div>
 
-        <nav className="flex flex-col gap-2 px-4 py-6 md:py-2 flex-1">
+        <nav className="flex flex-col gap-2 px-4 py-4 md:py-2 flex-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -169,7 +169,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
         </nav>
 
         <div className="p-4 mt-auto border-t border-zinc-800/50 flex flex-col gap-2">
-          {profile?.role === "admin" && (
+          {profile?.isAdmin && (
             <button
               onClick={() => {
                 setActiveTab("admin");
@@ -220,7 +220,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto w-full">
+      <main className="flex-1 overflow-y-auto w-full pb-6 md:pb-0">
         <div className="max-w-5xl mx-auto p-4 md:p-8">{children}</div>
       </main>
 

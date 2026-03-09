@@ -12,7 +12,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Transaction, Category, Card as CardType } from "../types";
-import { formatCurrency, formatDate, parseLocalDate } from "../lib/utils";
+import { formatCurrency } from "../lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { MonthSelector } from "../components/MonthSelector";
 import { useProfile } from "../contexts/ProfileContext";
@@ -110,7 +110,7 @@ export function Dashboard({
   const currentYear = selectedMonth.getFullYear();
 
   const monthTransactions = transactions.filter((tx) => {
-    const date = parseLocalDate(tx.date);
+    const date = new Date(tx.date);
     return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
   });
 
@@ -132,7 +132,7 @@ export function Dashboard({
   const projectedBalance = balance + plannedImpact;
 
   const recentTransactions = [...monthTransactions]
-    .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 8);
 
   const getCategoryName = (categoryId?: string) => {
@@ -263,7 +263,7 @@ export function Dashboard({
                         <div className="mt-1 flex flex-wrap gap-2 text-xs text-zinc-500">
                           <span>{getCategoryName(tx.categoryId)}</span>
                           <span>•</span>
-                          <span>{formatDate(tx.date, language)}</span>
+                          <span>{new Date(tx.date).toLocaleDateString(language)}</span>
                         </div>
                       </div>
                     </div>

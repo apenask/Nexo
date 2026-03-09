@@ -35,15 +35,16 @@ import {
 } from "./types";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import { parseLocalDate } from "./lib/utils";
 
 type DbProfile = {
   id: string;
   email: string | null;
   created_at: string | null;
   last_login: string | null;
+  last_seen?: string | null;
   preferred_currency: string | null;
   role: string | null;
+  is_admin?: boolean | null;
 };
 
 type DbCategory = {
@@ -98,13 +99,17 @@ type DbTransaction = {
 };
 
 function mapProfile(db: DbProfile): Profile {
+  const isAdmin = Boolean(db.is_admin) || db.role === "admin";
+
   return {
     id: db.id,
     email: db.email ?? "",
     created_at: db.created_at ?? new Date().toISOString(),
     last_login: db.last_login,
     preferred_currency: db.preferred_currency ?? "BRL",
-    role: (db.role as "user" | "admin") ?? "user",
+    role: isAdmin ? "admin" : "user",
+    isAdmin,
+    last_seen: db.last_seen ?? null,
   };
 }
 
@@ -233,6 +238,90 @@ export default function App() {
     });
   }, [session?.id]);
 
+  useEffect(() => {
+    if (!session?.id) return;
+
+    let cancelled = false;
+
+    const updatePresence = async (isOnline = true) => {
+      if (cancelled) return;
+      const nowIso = new Date().toISOString();
+      const expiresAtIso = new Date(Date.now() + 90 * 1000).toISOString();
+
+      const [{ error: profileError }, { error: presenceError }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .update({ last_seen: nowIso })
+          .eq("id", session.id),
+        supabase
+          .from("user_presence")
+          .upsert({
+            user_id: session.id,
+            is_online: isOnline,
+            last_seen: nowIso,
+            expires_at: isOnline ? expiresAtIso : nowIso,
+            updated_at: nowIso,
+          }, { onConflict: "user_id" }),
+      ]);
+
+      if (profileError) {
+        console.warn("Não foi possível atualizar last_seen do profile:", profileError.message);
+      }
+
+      if (presenceError) {
+        console.warn("Não foi possível atualizar presença:", presenceError.message);
+      }
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              last_seen: nowIso,
+            }
+          : current
+      );
+    };
+
+    const markOffline = () => {
+      updatePresence(false);
+    };
+
+    ensureUserProfile(session)
+      .catch((error) => {
+        console.error("Erro ao garantir profile antes da presença:", error);
+      })
+      .finally(() => {
+        updatePresence(true);
+      });
+
+    const interval = window.setInterval(() => updatePresence(true), 30000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        updatePresence(true);
+      } else {
+        markOffline();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      updatePresence(true);
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("beforeunload", markOffline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("beforeunload", markOffline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      markOffline();
+    };
+  }, [session?.id]);
+
   const syncAll = async (user: User) => {
     await ensureUserProfile(user);
     await loadUserData(user.id);
@@ -257,8 +346,10 @@ export default function App() {
         email: user.email ?? "",
         created_at: now,
         last_login: now,
+        last_seen: now,
         preferred_currency: "BRL",
         role: "user",
+        is_admin: false,
       };
 
       const { error: insertError } = await supabase.from("profiles").insert(newProfile);
@@ -272,6 +363,8 @@ export default function App() {
           last_login: now,
           preferred_currency: "BRL",
           role: "user",
+          isAdmin: false,
+          last_seen: now,
         });
         return;
       }
@@ -285,6 +378,7 @@ export default function App() {
       .update({
         email: user.email ?? existingProfile.email,
         last_login: now,
+        last_seen: now,
       })
       .eq("id", user.id);
 
@@ -297,6 +391,7 @@ export default function App() {
         ...existingProfile,
         email: user.email ?? existingProfile.email,
         last_login: now,
+        last_seen: now,
       })
     );
   };
@@ -740,7 +835,7 @@ export default function App() {
         ) {
           const exists = transactions.some((t) => {
             if (t.recurringTransactionId !== rt.id) return false;
-            const tDate = parseLocalDate(t.date);
+            const tDate = new Date(t.date);
 
             if (rt.recurrenceType === "mensal" || rt.recurrenceType === "anual") {
               return (
@@ -774,7 +869,7 @@ export default function App() {
   const allTransactions = useMemo(
     () =>
       [...transactions, ...getProjectedTransactions()].sort(
-        (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       ),
     [transactions, recurringTransactions]
   );
@@ -886,7 +981,7 @@ export default function App() {
         return <SettingsPage />;
 
       case "admin":
-        return profile?.role === "admin" ? <AdminDashboard /> : dashboardFallback;
+        return profile?.isAdmin ? <AdminDashboard /> : dashboardFallback;
 
       default:
         return dashboardFallback;
