@@ -48,7 +48,7 @@ export function AdminDashboard() {
     const [metricsRes, recentUsersRes, settingsRes] = await Promise.all([
       supabase.rpc("admin_dashboard_metrics"),
       supabase.rpc("admin_recent_users", { limit_count: 20 }),
-      supabase.from("app_settings").select("maintenance_mode").eq("id", 1).maybeSingle(),
+      supabase.rpc("get_maintenance_mode"),
     ]);
 
     if (metricsRes.error) {
@@ -75,7 +75,7 @@ export function AdminDashboard() {
     }
 
     if (!settingsRes.error) {
-      setMaintenanceMode(Boolean(settingsRes.data?.maintenance_mode));
+      setMaintenanceMode(Boolean(settingsRes.data));
     }
 
     const rawMetrics = metricsRes.data as MetricsRow | MetricsRow[] | null;
@@ -132,9 +132,9 @@ export function AdminDashboard() {
 
     const nextValue = !maintenanceMode;
 
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert({ id: 1, maintenance_mode: nextValue, updated_at: new Date().toISOString() });
+    const { error } = await supabase.rpc("set_maintenance_mode", {
+      enabled: nextValue,
+    });
 
     if (error) {
       setErrorMessage(error.message);

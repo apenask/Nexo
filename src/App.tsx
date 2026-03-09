@@ -276,23 +276,19 @@ export default function App() {
     let isMounted = true;
 
     const loadAppSettings = async () => {
-      const { data, error } = await supabase
-        .from("app_settings")
-        .select("maintenance_mode")
-        .eq("id", 1)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("get_maintenance_mode");
 
       if (error) {
-        console.warn("Não foi possível carregar app_settings:", error.message);
+        console.warn("Não foi possível carregar maintenance mode:", error.message);
         return;
       }
 
       if (isMounted) {
-        setMaintenanceMode(Boolean(data?.maintenance_mode));
+        setMaintenanceMode(Boolean(data));
       }
     };
 
-    loadAppSettings();
+    void loadAppSettings();
 
     const channel = supabase
       .channel("app-settings-live")
@@ -307,7 +303,7 @@ export default function App() {
 
     const interval = window.setInterval(() => {
       void loadAppSettings();
-    }, 15000);
+    }, 10000);
 
     return () => {
       isMounted = false;
@@ -1298,11 +1294,35 @@ export default function App() {
 
 function MaintenanceScreen() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-xl rounded-[32px] border border-white/10 bg-white/[0.03] p-8 text-center shadow-[0_30px_120px_-48px_rgba(99,102,241,0.45)] backdrop-blur-2xl">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/15 bg-amber-500/10 text-amber-200">🔧</div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Nexo em manutenção</h1>
-        <p className="mt-3 text-sm leading-7 text-zinc-400">Estamos aplicando melhorias e ajustes para deixar a experiência ainda melhor. Volte em breve.</p>
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.18),_transparent_40%),radial-gradient(circle_at_bottom,_rgba(16,185,129,0.12),_transparent_35%)]" />
+      <div className="relative min-h-screen flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-2xl rounded-[32px] border border-white/10 bg-white/[0.04] p-8 md:p-10 text-center shadow-[0_30px_120px_-48px_rgba(99,102,241,0.45)] backdrop-blur-2xl">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[28px] border border-amber-400/20 bg-amber-500/10 text-4xl shadow-[0_0_40px_rgba(245,158,11,0.15)]">🔧</div>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300/80">Modo manutenção</p>
+          <h1 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight text-white">
+            Estamos melhorando o Nexo para você
+          </h1>
+          <p className="mt-4 text-sm md:text-base leading-7 text-zinc-300 max-w-xl mx-auto">
+            Estamos aplicando ajustes e melhorias para deixar sua experiência ainda mais estável, rápida e agradável.
+            Volte em instantes.
+          </p>
+
+          <div className="mt-8 grid gap-3 text-left md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
+              <div className="text-sm font-medium text-zinc-100">Ajustes no sistema</div>
+              <p className="mt-2 text-xs leading-6 text-zinc-400">Estamos refinando recursos para deixar tudo funcionando da melhor forma.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
+              <div className="text-sm font-medium text-zinc-100">Retorno em breve</div>
+              <p className="mt-2 text-xs leading-6 text-zinc-400">O acesso será liberado novamente assim que a manutenção for concluída.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
+              <div className="text-sm font-medium text-zinc-100">Seu ambiente está seguro</div>
+              <p className="mt-2 text-xs leading-6 text-zinc-400">Essa pausa serve para garantir mais estabilidade e confiança no uso da plataforma.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
