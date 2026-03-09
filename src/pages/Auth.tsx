@@ -17,6 +17,7 @@ import {
   PlayCircle,
   ShieldCheck,
   Sparkles,
+  Target,
   TrendingUp,
   Wallet,
   HeartHandshake,
@@ -52,6 +53,12 @@ const featureCards = [
     description:
       "Tenha suas finanças organizadas com um fluxo direto, visual e seguro para acompanhar tudo no mesmo lugar.",
   },
+  {
+    icon: Target,
+    title: "Metas para conquistar objetivos",
+    description:
+      "Crie metas de economia, acompanhe o progresso e saiba quanto falta para tirar seus planos do papel.",
+  },
 ];
 
 const highlightItems = [
@@ -59,6 +66,7 @@ const highlightItems = [
   "Organize cartões, categorias e lançamentos sem complicação",
   "Tenha relatórios visuais para entender para onde seu dinheiro vai",
   "Use no celular com uma experiência premium e fluida",
+  "Defina metas e acompanhe quanto falta para chegar ao seu objetivo",
 ];
 
 export function Auth() {
@@ -194,7 +202,7 @@ O Nexo reúne seus lançamentos, cartões, categorias e relatórios em uma exper
               <MetricChip label="Experiência" value="Premium e fluida" />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {featureCards.map((item) => {
                 const Icon = item.icon;
                 return (

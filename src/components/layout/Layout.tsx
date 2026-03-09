@@ -12,6 +12,7 @@ import {
   LogOut,
   Settings,
   ShieldAlert,
+  Target,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { supabase } from "../../lib/supabase";
@@ -41,6 +42,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           categories: "Categories",
           cards: "Cards",
           reports: "Reports",
+          goals: "Goals",
           settings: "Settings",
           logout: "Sign out",
           dev: "Admin",
@@ -54,6 +56,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           categories: "Categorías",
           cards: "Tarjetas",
           reports: "Informes",
+          goals: "Metas",
           settings: "Configuración",
           logout: "Cerrar sesión",
           dev: "Admin",
@@ -68,6 +71,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           categories: "Categorias",
           cards: "Cartões",
           reports: "Relatórios",
+          goals: "Metas",
           settings: "Configurações",
           logout: "Sair da conta",
           dev: "Admin",
@@ -83,6 +87,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
     { id: "categories", label: text.categories, icon: Tags },
     { id: "cards", label: text.cards, icon: CreditCard },
     { id: "reports", label: text.reports, icon: BarChart3 },
+    { id: "goals", label: text.goals, icon: Target },
   ];
 
   const handleLogout = async () => {

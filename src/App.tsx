@@ -19,6 +19,7 @@ import { CardsPage } from "./pages/Cards";
 import { RecurringTransactionsPage } from "./pages/RecurringTransactions";
 import { SettingsPage } from "./pages/Settings";
 import { AdminDashboard } from "./pages/AdminDashboard";
+import { GoalsPage } from "./pages/GoalsPage";
 import { Auth } from "./pages/Auth";
 
 import { AddTransactionModal } from "./components/AddTransactionModal";
@@ -32,6 +33,8 @@ import {
   Card,
   RecurringTransaction,
   Profile,
+  Goal,
+  GoalContribution,
 } from "./types";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -95,6 +98,26 @@ type DbTransaction = {
   installment_count: number | null;
   installment_group_id: string | null;
   recurring_transaction_id: string | null;
+  created_at?: string | null;
+};
+
+type DbGoal = {
+  id: string;
+  user_id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number | null;
+  target_date: string | null;
+  created_at?: string | null;
+};
+
+type DbGoalContribution = {
+  id: string;
+  goal_id: string;
+  user_id: string;
+  amount: number;
+  contribution_date: string | null;
+  notes: string | null;
   created_at?: string | null;
 };
 
@@ -167,6 +190,28 @@ function mapTransaction(db: DbTransaction): Transaction {
   };
 }
 
+function mapGoal(db: DbGoal): Goal {
+  return {
+    id: db.id,
+    name: db.name,
+    targetAmount: Number(db.target_amount ?? 0),
+    currentAmount: Number(db.current_amount ?? 0),
+    targetDate: db.target_date ?? undefined,
+    created_at: db.created_at ?? null,
+  };
+}
+
+function mapGoalContribution(db: DbGoalContribution): GoalContribution {
+  return {
+    id: db.id,
+    goalId: db.goal_id,
+    amount: Number(db.amount ?? 0),
+    contributionDate: db.contribution_date ?? new Date().toISOString().split("T")[0],
+    notes: db.notes ?? undefined,
+    created_at: db.created_at ?? null,
+  };
+}
+
 export default function App() {
   const [session, setSession] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -181,6 +226,10 @@ export default function App() {
   const [recurringTransactions, setRecurringTransactions] = useState<
     RecurringTransaction[]
   >([]);
+
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalContributions, setGoalContributions] = useState<GoalContribution[]>([]);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(
@@ -224,12 +273,58 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadAppSettings = async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("maintenance_mode")
+        .eq("id", 1)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("Não foi possível carregar app_settings:", error.message);
+        return;
+      }
+
+      if (isMounted) {
+        setMaintenanceMode(Boolean(data?.maintenance_mode));
+      }
+    };
+
+    loadAppSettings();
+
+    const channel = supabase
+      .channel("app-settings-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings" },
+        () => {
+          void loadAppSettings();
+        }
+      )
+      .subscribe();
+
+    const interval = window.setInterval(() => {
+      void loadAppSettings();
+    }, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!session?.id) {
       setProfile(null);
       setTransactions([]);
       setCategories([]);
       setCards([]);
       setRecurringTransactions([]);
+      setGoals([]);
+      setGoalContributions([]);
       return;
     }
 
@@ -447,9 +542,19 @@ export default function App() {
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("goals")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("goal_contributions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("contribution_date", { ascending: false }),
     ]);
 
-    const [transactionsRes, categoriesRes, cardsRes, recurringRes] = results;
+    const [transactionsRes, categoriesRes, cardsRes, recurringRes, goalsRes, goalContributionsRes] = results;
 
     if (transactionsRes.status === "fulfilled" && !transactionsRes.value.error) {
       setTransactions((transactionsRes.value.data ?? []).map(mapTransaction));
@@ -465,6 +570,14 @@ export default function App() {
 
     if (recurringRes.status === "fulfilled" && !recurringRes.value.error) {
       setRecurringTransactions((recurringRes.value.data ?? []).map(mapRecurringTransaction));
+    }
+
+    if (goalsRes.status === "fulfilled" && !goalsRes.value.error) {
+      setGoals((goalsRes.value.data ?? []).map(mapGoal));
+    }
+
+    if (goalContributionsRes.status === "fulfilled" && !goalContributionsRes.value.error) {
+      setGoalContributions((goalContributionsRes.value.data ?? []).map(mapGoalContribution));
     }
   };
 
@@ -836,6 +949,83 @@ export default function App() {
     setIsAddModalOpen(true);
   };
 
+  const handleAddGoal = async (goal: Omit<Goal, "id" | "currentAmount" | "created_at">) => {
+    if (!session?.id) return;
+
+    try {
+      const payload = {
+        user_id: session.id,
+        name: goal.name,
+        target_amount: goal.targetAmount,
+        current_amount: 0,
+        target_date: goal.targetDate || null,
+      };
+
+      const { data, error } = await supabase
+        .from("goals")
+        .insert(payload)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      setGoals((prev) => [mapGoal(data as DbGoal), ...prev]);
+      toast.success("Meta criada com sucesso!");
+    } catch (error) {
+      console.error("Erro ao criar meta:", error);
+      toast.error("Erro ao criar meta.");
+    }
+  };
+
+  const handleAddGoalContribution = async (goalId: string, amount: number, contributionDate?: string, notes?: string) => {
+    if (!session?.id) return;
+
+    try {
+      const payload = {
+        user_id: session.id,
+        goal_id: goalId,
+        amount,
+        contribution_date: contributionDate || new Date().toISOString().split("T")[0],
+        notes: notes || null,
+      };
+
+      const { data, error } = await supabase
+        .from("goal_contributions")
+        .insert(payload)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      setGoalContributions((prev) => [mapGoalContribution(data as DbGoalContribution), ...prev]);
+      setGoals((prev) =>
+        prev.map((goal) =>
+          goal.id === goalId
+            ? { ...goal, currentAmount: Number(goal.currentAmount ?? 0) + Number(amount) }
+            : goal
+        )
+      );
+      toast.success("Valor adicionado à meta!");
+    } catch (error) {
+      console.error("Erro ao adicionar valor à meta:", error);
+      toast.error("Erro ao adicionar valor à meta.");
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    try {
+      const { error } = await supabase.from("goals").delete().eq("id", goalId);
+      if (error) throw error;
+
+      setGoals((prev) => prev.filter((goal) => goal.id !== goalId));
+      setGoalContributions((prev) => prev.filter((item) => item.goalId !== goalId));
+      toast.success("Meta removida.");
+    } catch (error) {
+      console.error("Erro ao remover meta:", error);
+      toast.error("Erro ao remover meta.");
+    }
+  };
+
   const getProjectedTransactions = (): Transaction[] => {
     const projected: Transaction[] = [];
     const today = new Date();
@@ -1006,6 +1196,17 @@ export default function App() {
           />
         );
 
+      case "goals":
+        return (
+          <GoalsPage
+            goals={goals}
+            contributions={goalContributions}
+            onAddGoal={handleAddGoal}
+            onAddContribution={handleAddGoalContribution}
+            onDeleteGoal={handleDeleteGoal}
+          />
+        );
+
       case "settings":
         return <SettingsPage />;
 
@@ -1030,6 +1231,15 @@ export default function App() {
       <>
         <Toaster theme="dark" position="top-right" />
         <Auth />
+      </>
+    );
+  }
+
+  if (maintenanceMode && profile && !profile.isAdmin) {
+    return (
+      <>
+        <Toaster theme="dark" position="top-right" />
+        <MaintenanceScreen />
       </>
     );
   }
@@ -1083,5 +1293,17 @@ export default function App() {
         )}
       </ProfileProvider>
     </LanguageProvider>
+  );
+}
+
+function MaintenanceScreen() {
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-xl rounded-[32px] border border-white/10 bg-white/[0.03] p-8 text-center shadow-[0_30px_120px_-48px_rgba(99,102,241,0.45)] backdrop-blur-2xl">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/15 bg-amber-500/10 text-amber-200">🔧</div>
+        <h1 className="text-3xl font-bold tracking-tight text-white">Nexo em manutenção</h1>
+        <p className="mt-3 text-sm leading-7 text-zinc-400">Estamos aplicando melhorias e ajustes para deixar a experiência ainda melhor. Volte em breve.</p>
+      </div>
+    </div>
   );
 }

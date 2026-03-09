@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
-import { Users, UserCheck, UserX, RefreshCw, ShieldAlert } from "lucide-react";
+import { Users, UserCheck, UserX, RefreshCw, ShieldAlert, Wrench } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useProfile } from "../contexts/ProfileContext";
 import { formatDate } from "../lib/utils";
@@ -33,6 +33,8 @@ export function AdminDashboard() {
   const [recentUsers, setRecentUsers] = useState<RecentUserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
 
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
@@ -43,9 +45,10 @@ export function AdminDashboard() {
       console.warn("Não foi possível sincronizar profiles com auth.users:", syncRes.error.message);
     }
 
-    const [metricsRes, recentUsersRes] = await Promise.all([
+    const [metricsRes, recentUsersRes, settingsRes] = await Promise.all([
       supabase.rpc("admin_dashboard_metrics"),
       supabase.rpc("admin_recent_users", { limit_count: 20 }),
+      supabase.from("app_settings").select("maintenance_mode").eq("id", 1).maybeSingle(),
     ]);
 
     if (metricsRes.error) {
@@ -69,6 +72,10 @@ export function AdminDashboard() {
       setRecentUsers([]);
     } else {
       setRecentUsers((recentUsersRes.data ?? []) as RecentUserRow[]);
+    }
+
+    if (!settingsRes.error) {
+      setMaintenanceMode(Boolean(settingsRes.data?.maintenance_mode));
     }
 
     const rawMetrics = metricsRes.data as MetricsRow | MetricsRow[] | null;
@@ -118,6 +125,26 @@ export function AdminDashboard() {
     [metrics.offline_users, totalCount, onlineCount]
   );
 
+
+  const toggleMaintenanceMode = async () => {
+    setIsTogglingMaintenance(true);
+    setErrorMessage(null);
+
+    const nextValue = !maintenanceMode;
+
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert({ id: 1, maintenance_mode: nextValue, updated_at: new Date().toISOString() });
+
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setMaintenanceMode(nextValue);
+    }
+
+    setIsTogglingMaintenance(false);
+  };
+
   if (!profile?.isAdmin) {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -161,6 +188,28 @@ export function AdminDashboard() {
           <CardContent className="py-4 text-sm text-rose-200">{errorMessage}</CardContent>
         </Card>
       )}
+
+      <Card className="bg-zinc-900/40 border-zinc-800/40">
+        <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-400/15 flex items-center justify-center text-amber-200">
+              <Wrench size={18} />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-zinc-100">Modo manutenção</div>
+              <p className="mt-1 text-sm text-zinc-400">Quando ativado, apenas contas admin continuam acessando o app. Os demais usuários veem a tela de manutenção.</p>
+            </div>
+          </div>
+
+          <Button
+            onClick={toggleMaintenanceMode}
+            disabled={isTogglingMaintenance}
+            className={maintenanceMode ? "bg-amber-300 text-zinc-950 hover:bg-amber-200" : "bg-white text-zinc-950 hover:bg-zinc-200"}
+          >
+            {isTogglingMaintenance ? "Salvando..." : maintenanceMode ? "Desativar manutenção" : "Ativar manutenção"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard icon={<Users size={16} />} label="Usuários cadastrados" value={totalCount} />

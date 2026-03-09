@@ -63,3 +63,21 @@ export interface DailyBalance {
   balance: number;
   runningBalance: number;
 }
+
+export interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string;
+  created_at?: string | null;
+}
+
+export interface GoalContribution {
+  id: string;
+  goalId: string;
+  amount: number;
+  contributionDate: string;
+  notes?: string;
+  created_at?: string | null;
+}
