@@ -145,9 +145,6 @@ export function SettingsPage() {
                   {isPresenceOnline ? "Online agora" : "Offline no momento"}
                 </p>
               </div>
-              <p className="mt-2 text-xs text-zinc-500">
-                Essa luz acompanha a sua sessão ativa no navegador e também alimenta o painel admin.
-              </p>
             </div>
           </CardContent>
         </Card>
