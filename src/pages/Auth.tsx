@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
+import pixQrImage from "../assets/pix-nexo.jpeg";
 import {
   ArrowRight,
   BadgeCheck,
@@ -19,9 +20,18 @@ import {
   Sparkles,
   TrendingUp,
   Wallet,
+  HeartHandshake,
+  Copy,
+  QrCode,
 } from "lucide-react";
 
 type AuthView = "landing" | "login" | "signup";
+
+const SUPPORT_PIX_KEY = "225161c5-c97a-413e-8a20-801fb8d40f02";
+const SUPPORT_PIX_PAYLOAD =
+  "00020126780014br.gov.bcb.pix0136225161c5-c97a-413e-8a20-801fb8d40f020216Doacao pelo Nexo5204000053039865802BR5918Rickelme Alexandre6009Sao Paulo62240520daqr15926716942233266304BAFF";
+const SUPPORT_OWNER = "Rickelme Alexandre Souza da Silva";
+const SUPPORT_LABEL = "Ajude o criador";
 
 const featureCards = [
   {
@@ -38,17 +48,17 @@ const featureCards = [
   },
   {
     icon: ShieldCheck,
-    title: "Acesso rápido e seguro",
+    title: "Mais controle, menos bagunça",
     description:
-      "Crie sua conta, entre na hora e comece a testar o sistema sem depender de confirmação por e-mail.",
+      "Tenha suas finanças organizadas com um fluxo direto, visual e seguro para acompanhar tudo no mesmo lugar.",
   },
 ];
 
 const highlightItems = [
-  "Controle financeiro pessoal com visual premium",
-  "Experiência responsiva pensada para celular",
-  "Dashboard, cartões, categorias e relatórios no mesmo lugar",
-  "Cadastro rápido para começar a testar em segundos",
+  "Veja saldo, receitas e despesas de forma clara e bonita",
+  "Organize cartões, categorias e lançamentos sem complicação",
+  "Tenha relatórios visuais para entender para onde seu dinheiro vai",
+  "Use no celular com uma experiência premium e fluida",
 ];
 
 export function Auth() {
@@ -59,12 +69,13 @@ export function Auth() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<"email" | "password" | null>(null);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   const isLogin = view === "login";
   const mascotMood = useMemo(() => {
-    if (focusedField === "password") return "covered";
-    if (focusedField === "email") return "watching";
-    return "idle";
+    if (focusedField === "password") return "covered" as const;
+    if (focusedField === "email") return "watching" as const;
+    return "idle" as const;
   }, [focusedField]);
 
   const scrollToForm = (nextView: Exclude<AuthView, "landing">) => {
@@ -72,6 +83,15 @@ export function Auth() {
     window.requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+  };
+
+  const copyToClipboard = async (value: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(successMessage);
+    } catch {
+      toast.error("Não foi possível copiar agora.");
+    }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -102,7 +122,7 @@ export function Auth() {
 
           if (loginFallback.error) {
             throw new Error(
-              "A conta foi criada, mas o login automático não aconteceu. Confira se a confirmação por e-mail está desativada no Supabase."
+              "A conta foi criada, mas o login automático não aconteceu. Desative a confirmação por e-mail no Supabase para o fluxo entrar direto."
             );
           }
         }
@@ -146,8 +166,7 @@ export function Auth() {
             >
               Entrar
             </Button>
-            <Button className="bg-white text-zinc-950 hover:bg-zinc-200" onClick={() => scrollToForm("signup")}
-            >
+            <Button className="bg-white text-zinc-950 hover:bg-zinc-200" onClick={() => scrollToForm("signup")}>
               Testar agora
             </Button>
           </div>
@@ -201,7 +220,7 @@ export function Auth() {
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-zinc-100">Tudo em um só lugar</div>
-                    <div className="text-xs text-zinc-500">Uma porta de entrada para testar o sistema completo</div>
+                    <div className="text-xs text-zinc-500">Uma forma elegante de testar o sistema e sentir o valor do produto</div>
                   </div>
                 </div>
 
@@ -218,8 +237,8 @@ export function Auth() {
               <div className="rounded-[30px] border border-white/10 bg-zinc-950/60 p-6 backdrop-blur-2xl">
                 <div className="mb-5 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-semibold text-zinc-100">Como funciona</div>
-                    <p className="mt-1 text-sm text-zinc-500">Um fluxo simples para a pessoa testar sem atrito.</p>
+                    <div className="text-sm font-semibold text-zinc-100">Benefícios para você</div>
+                    <p className="mt-1 text-sm text-zinc-500">Tudo pensado para tornar seu controle financeiro mais claro, leve e agradável.</p>
                   </div>
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-200 border border-indigo-400/20">
                     <PlayCircle size={18} />
@@ -228,10 +247,10 @@ export function Auth() {
 
                 <div className="space-y-3">
                   {[
-                    "A pessoa cai nesta tela de apresentação e entende o valor do sistema.",
-                    "Clica em testar, cria a conta com e-mail e senha e entra automaticamente.",
-                    "O app já libera acesso ao painel e começa a registrar presença no sistema.",
-                    "Seu painel ADM passa a enxergar quem está usando a plataforma.",
+                    "Acompanhe saldo, receitas e despesas em uma interface bonita e fácil de entender.",
+                    "Tenha uma rotina mais organizada para lançar gastos, cartões e categorias sem esforço.",
+                    "Visualize melhor seus hábitos financeiros e identifique para onde o dinheiro está indo.",
+                    "Use uma experiência rápida, fluida e agradável tanto no celular quanto no desktop.",
                   ].map((item, index) => (
                     <div key={item} className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/8 text-sm font-semibold text-zinc-100">
@@ -268,7 +287,7 @@ export function Auth() {
                       ? "Entre no sistema com um fluxo mais agradável e profissional. Você pode testar tudo em poucos segundos."
                       : isLogin
                       ? "Volte para o seu painel e continue acompanhando suas finanças com uma experiência premium."
-                      : "Com a confirmação por e-mail desativada no Supabase, a conta é criada e o acesso já acontece automaticamente."}
+                      : "Crie sua conta em instantes e comece a usar o sistema logo após o cadastro."}
                   </p>
                 </div>
 
@@ -304,12 +323,28 @@ export function Auth() {
                         Já tenho conta
                       </Button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowSupportModal(true)}
+                      className="mt-4 flex w-full items-center justify-between rounded-[22px] border border-emerald-400/15 bg-emerald-500/8 px-4 py-4 text-left transition hover:bg-emerald-500/12"
+                    >
+                      <div>
+                        <div className="text-sm font-semibold text-zinc-100">{SUPPORT_LABEL}</div>
+                        <p className="mt-1 text-xs leading-5 text-zinc-400">
+                          Se quiser apoiar o projeto, você pode enviar uma contribuição de forma simples e elegante.
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                        Apoiar
+                      </div>
+                    </button>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
                     <QuickInfo title="Cadastro rápido" value="Sem atrito" />
                     <QuickInfo title="Acesso" value="Automático" />
-                    <QuickInfo title="Painel ADM" value="Métricas vivas" />
+                    <QuickInfo title="Experiência" value="Premium" />
                   </div>
                 </div>
               ) : (
@@ -420,6 +455,14 @@ export function Auth() {
           </section>
         </div>
       </div>
+
+      {showSupportModal && (
+        <SupportModal
+          onClose={() => setShowSupportModal(false)}
+          onCopyPixKey={() => copyToClipboard(SUPPORT_PIX_KEY, "Chave Pix copiada com sucesso!")}
+          onCopyPixPayload={() => copyToClipboard(SUPPORT_PIX_PAYLOAD, "Pix copia e cola copiado com sucesso!")}
+        />
+      )}
     </div>
   );
 }
@@ -443,7 +486,8 @@ function QuickInfo({ title, value }: { title: string; value: string }) {
 }
 
 function MascotCard({ mood }: { mood: "idle" | "watching" | "covered" }) {
-  const pupilsClass = mood === "watching" ? "translate-x-[2px] -translate-y-[1px]" : "translate-x-0 translate-y-0";
+  const pupilsClass =
+    mood === "watching" ? "translate-x-[2px] -translate-y-[1px]" : "translate-x-0 translate-y-0";
 
   return (
     <div className="relative hidden h-[132px] w-[132px] shrink-0 rounded-[32px] border border-white/10 bg-white/[0.04] p-4 sm:block">
@@ -470,6 +514,108 @@ function MascotCard({ mood }: { mood: "idle" | "watching" | "covered" }) {
         </div>
         <div className="mt-3 text-center text-[11px] uppercase tracking-[0.18em] text-zinc-400">
           {mood === "covered" ? "Modo senha" : mood === "watching" ? "Olhando o email" : "Pronto para entrar"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SupportModal({
+  onClose,
+  onCopyPixKey,
+  onCopyPixPayload,
+}: {
+  onClose: () => void;
+  onCopyPixKey: () => void;
+  onCopyPixPayload: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950 p-6 shadow-[0_30px_120px_-48px_rgba(16,185,129,0.5)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-zinc-400 transition hover:text-white"
+        >
+          Fechar
+        </button>
+
+        <div className="pr-12">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200">
+            <HeartHandshake size={14} />
+            {SUPPORT_LABEL}
+          </div>
+          <h3 className="mt-4 text-2xl font-bold text-white">Contribua com o projeto</h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">
+            Se você gostou da proposta do Nexo e quiser fortalecer a evolução do produto, pode enviar uma contribuição. O apoio é opcional.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-zinc-100">Destinatário</div>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">{SUPPORT_OWNER}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-zinc-400">
+                Pix
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 px-4 py-3 text-sm break-all text-zinc-200">
+              {SUPPORT_PIX_KEY}
+            </div>
+
+            <Button
+              type="button"
+              className="mt-4 h-11 w-full rounded-2xl bg-white text-zinc-950 hover:bg-zinc-200"
+              onClick={onCopyPixKey}
+            >
+              <Copy size={16} className="mr-2" />
+              Copiar chave Pix
+            </Button>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-sm font-semibold text-zinc-100">Pix copia e cola</div>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              Também deixei o código completo para copiar em um toque.
+            </p>
+
+            <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 px-4 py-3 text-xs leading-5 break-all text-zinc-300">
+              {SUPPORT_PIX_PAYLOAD}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4 h-11 w-full rounded-2xl border-white/10 bg-white/[0.03] text-zinc-100 hover:bg-white/[0.06]"
+              onClick={onCopyPixPayload}
+            >
+              <Copy size={16} className="mr-2" />
+              Copiar código Pix
+            </Button>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+              <QrCode size={16} />
+              QR Code
+            </div>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              QR já configurado com o Pix do Nexo.
+            </p>
+
+            <div className="mt-4 flex items-center justify-center rounded-[28px] border border-white/8 bg-white p-4">
+              <img
+                src={pixQrImage}
+                alt="QR Code para apoio ao criador"
+                className="h-[220px] w-[220px] rounded-2xl object-contain"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

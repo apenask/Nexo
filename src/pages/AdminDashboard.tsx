@@ -6,28 +6,31 @@ import { Button } from "../components/ui/button";
 import { useProfile } from "../contexts/ProfileContext";
 import { formatDate } from "../lib/utils";
 
-type AdminProfileRow = {
+type MetricsRow = {
+  total_users: number;
+  online_users: number;
+  offline_users: number;
+};
+
+type RecentUserRow = {
   id: string;
   email: string | null;
   created_at: string | null;
   last_login: string | null;
-  is_admin?: boolean | null;
-  role?: string | null;
+  is_admin: boolean | null;
+  role: string | null;
+  is_online: boolean;
+  presence_last_seen: string | null;
 };
-
-type PresenceRow = {
-  user_id: string;
-  is_online: boolean | null;
-  last_seen: string | null;
-  expires_at: string | null;
-};
-
-const ONLINE_WINDOW_MS = 90 * 1000;
 
 export function AdminDashboard() {
   const { profile } = useProfile();
-  const [profiles, setProfiles] = useState<AdminProfileRow[]>([]);
-  const [presenceRows, setPresenceRows] = useState<PresenceRow[]>([]);
+  const [metrics, setMetrics] = useState<MetricsRow>({
+    total_users: 0,
+    online_users: 0,
+    offline_users: 0,
+  });
+  const [recentUsers, setRecentUsers] = useState<RecentUserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -35,40 +38,46 @@ export function AdminDashboard() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const [profilesRes, presenceRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, email, created_at, last_login, is_admin, role")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("user_presence")
-        .select("user_id, is_online, last_seen, expires_at"),
+    const syncRes = await supabase.rpc("sync_profiles_from_auth");
+    if (syncRes.error) {
+      console.warn("Não foi possível sincronizar profiles com auth.users:", syncRes.error.message);
+    }
+
+    const [metricsRes, recentUsersRes] = await Promise.all([
+      supabase.rpc("admin_dashboard_metrics"),
+      supabase.rpc("admin_recent_users", { limit_count: 20 }),
     ]);
 
-    if (profilesRes.error) {
+    if (metricsRes.error) {
       setErrorMessage(
-        profilesRes.error.message.includes("permission")
-          ? "Seu banco ainda não liberou leitura admin para profiles. Rode o SQL do pacote e tente novamente."
-          : profilesRes.error.message
+        metricsRes.error.message.includes("permission")
+          ? "Seu banco ainda não liberou o painel admin. Rode o SQL mais recente do pacote e tente novamente."
+          : metricsRes.error.message
       );
-      setProfiles([]);
-      setPresenceRows([]);
+      setMetrics({ total_users: 0, online_users: 0, offline_users: 0 });
+      setRecentUsers([]);
       setIsLoading(false);
       return;
     }
 
-    if (presenceRes.error) {
+    if (recentUsersRes.error) {
       setErrorMessage(
-        presenceRes.error.message.includes("permission")
-          ? "Seu banco ainda não liberou leitura admin para user_presence. Rode o SQL do pacote e tente novamente."
-          : presenceRes.error.message
+        recentUsersRes.error.message.includes("permission")
+          ? "Seu banco ainda não liberou a listagem admin. Rode o SQL mais recente do pacote e tente novamente."
+          : recentUsersRes.error.message
       );
-      setPresenceRows([]);
+      setRecentUsers([]);
     } else {
-      setPresenceRows(presenceRes.data ?? []);
+      setRecentUsers((recentUsersRes.data ?? []) as RecentUserRow[]);
     }
 
-    setProfiles(profilesRes.data ?? []);
+    const metricsRow = ((metricsRes.data ?? [])[0] as MetricsRow | undefined) ?? {
+      total_users: 0,
+      online_users: 0,
+      offline_users: 0,
+    };
+
+    setMetrics(metricsRow);
     setIsLoading(false);
   }, []);
 
@@ -82,22 +91,18 @@ export function AdminDashboard() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles" },
-        () => {
-          loadAdminData();
-        }
+        () => loadAdminData()
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_presence" },
-        () => {
-          loadAdminData();
-        }
+        () => loadAdminData()
       )
       .subscribe();
 
     const interval = window.setInterval(() => {
       loadAdminData();
-    }, 15000);
+    }, 10000);
 
     return () => {
       window.clearInterval(interval);
@@ -105,42 +110,12 @@ export function AdminDashboard() {
     };
   }, [profile?.isAdmin, loadAdminData]);
 
-  const presenceMap = useMemo(() => {
-    return new Map(presenceRows.map((item) => [item.user_id, item]));
-  }, [presenceRows]);
-
-  const metrics = useMemo(() => {
-    const now = Date.now();
-
-    const onlineUsers = profiles.filter((item) => {
-      const presence = presenceMap.get(item.id);
-      if (!presence?.expires_at) return false;
-      const expiresAt = new Date(presence.expires_at).getTime();
-      return Boolean(presence.is_online) && expiresAt > now - ONLINE_WINDOW_MS;
-    }).length;
-
-    const totalUsers = profiles.length;
-    const offlineUsers = Math.max(totalUsers - onlineUsers, 0);
-
-    return {
-      totalUsers,
-      onlineUsers,
-      offlineUsers,
-    };
-  }, [profiles, presenceMap]);
-
-  const recentUsers = useMemo(() => {
-    return profiles.slice(0, 20).map((user) => {
-      const presence = presenceMap.get(user.id);
-      const isOnline = Boolean(presence?.is_online) && Boolean(presence?.expires_at) && new Date(presence!.expires_at as string).getTime() > Date.now() - ONLINE_WINDOW_MS;
-
-      return {
-        ...user,
-        isOnline,
-        presenceLastSeen: presence?.last_seen ?? null,
-      };
-    });
-  }, [profiles, presenceMap]);
+  const onlineCount = useMemo(() => Number(metrics.online_users || 0), [metrics.online_users]);
+  const totalCount = useMemo(() => Number(metrics.total_users || 0), [metrics.total_users]);
+  const offlineCount = useMemo(
+    () => Math.max(Number(metrics.offline_users || 0), totalCount - onlineCount, 0),
+    [metrics.offline_users, totalCount, onlineCount]
+  );
 
   if (!profile?.isAdmin) {
     return (
@@ -165,7 +140,9 @@ export function AdminDashboard() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-zinc-50">Admin</h1>
-          <p className="text-zinc-400 mt-1">Acompanhe em tempo quase real quantas contas estão usando a plataforma.</p>
+          <p className="text-zinc-400 mt-1">
+            Acompanhe em tempo quase real quantas contas estão usando a plataforma.
+          </p>
         </div>
 
         <Button
@@ -185,9 +162,9 @@ export function AdminDashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard icon={<Users size={16} />} label="Usuários cadastrados" value={metrics.totalUsers} />
-        <StatCard icon={<UserCheck size={16} />} label="Online agora" value={metrics.onlineUsers} />
-        <StatCard icon={<UserX size={16} />} label="Offline agora" value={metrics.offlineUsers} />
+        <StatCard icon={<Users size={16} />} label="Usuários cadastrados" value={totalCount} />
+        <StatCard icon={<UserCheck size={16} />} label="Online agora" value={onlineCount} />
+        <StatCard icon={<UserX size={16} />} label="Offline agora" value={offlineCount} />
       </div>
 
       <Card className="bg-zinc-900/40 border-zinc-800/40">
@@ -219,12 +196,12 @@ export function AdminDashboard() {
                         )}
                         <span
                           className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border ${
-                            user.isOnline
+                            user.is_online
                               ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
                               : "bg-zinc-800/70 text-zinc-400 border-zinc-700/60"
                           }`}
                         >
-                          {user.isOnline ? "Online" : "Offline"}
+                          {user.is_online ? "Online" : "Offline"}
                         </span>
                       </div>
                       <div className="mt-1 text-xs text-zinc-500 break-all">{user.id}</div>
@@ -232,8 +209,12 @@ export function AdminDashboard() {
 
                     <div className="text-xs text-zinc-400 md:text-right">
                       <div>Criado em {user.created_at ? formatDate(user.created_at) : "-"}</div>
-                      <div>Último login {user.last_login ? new Date(user.last_login).toLocaleString("pt-BR") : "-"}</div>
-                      <div>Última presença {user.presenceLastSeen ? new Date(user.presenceLastSeen).toLocaleString("pt-BR") : "-"}</div>
+                      <div>
+                        Último login {user.last_login ? new Date(user.last_login).toLocaleString("pt-BR") : "-"}
+                      </div>
+                      <div>
+                        Última presença {user.presence_last_seen ? new Date(user.presence_last_seen).toLocaleString("pt-BR") : "-"}
+                      </div>
                     </div>
                   </div>
                 );

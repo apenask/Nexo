@@ -1,15 +1,31 @@
-NEXO - PASSOS IMPORTANTES PARA O NOVO FLUXO DE CADASTRO
+NEXO - PASSOS IMPORTANTES PARA O NOVO FLUXO
 
 1) No Supabase, desative a confirmação de e-mail:
    Authentication > Providers > Email > Confirm email = OFF
 
-2) Rode o arquivo SUPABASE_ADMIN_SETUP.sql para manter o painel ADM e a presença online/offline.
+2) Rode novamente o arquivo SUPABASE_ADMIN_SETUP.sql mais recente.
+   Ele agora:
+   - sincroniza auth.users com profiles
+   - cria/ajusta user_presence
+   - libera as policies necessárias
+   - cria as RPCs do painel admin
+   - adiciona profiles e user_presence no realtime
 
-3) Depois disso, o fluxo fica assim:
-   - usuário cria conta com e-mail e senha
-   - a sessão já é criada automaticamente
-   - o usuário entra direto no sistema
-   - o painel ADM consegue contar cadastro e presença
+3) Troque no SQL:
+   COLE_AQUI_O_SEU_USER_ID
+   pelo ID real da sua conta admin.
 
-4) Se a confirmação de e-mail continuar ligada, o cadastro pode até acontecer,
-   mas o login automático pode não entrar na hora.
+4) Depois de rodar o SQL:
+   - faça logout
+   - entre novamente na conta admin
+   - teste criar uma conta nova
+   - abra o painel admin e confira os números
+
+5) O painel admin agora lê os dados por RPC, então os números de:
+   - usuários cadastrados
+   - online agora
+   - offline agora
+   - contas recentes
+   devem refletir o banco de forma muito mais confiável.
+
+6) A navegação mobile também foi ajustada para o Dashboard aparecer corretamente no menu do celular.

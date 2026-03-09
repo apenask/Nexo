@@ -241,7 +241,10 @@ export default function App() {
   useEffect(() => {
     if (!session?.id) return;
 
+    let cancelled = false;
+
     const updatePresence = async (isOnline = true) => {
+      if (cancelled) return;
       const nowIso = new Date().toISOString();
       const expiresAtIso = new Date(Date.now() + 90 * 1000).toISOString();
 
@@ -283,7 +286,13 @@ export default function App() {
       updatePresence(false);
     };
 
-    updatePresence(true);
+    ensureUserProfile(session)
+      .catch((error) => {
+        console.error("Erro ao garantir profile antes da presença:", error);
+      })
+      .finally(() => {
+        updatePresence(true);
+      });
 
     const interval = window.setInterval(() => updatePresence(true), 30000);
 
@@ -304,6 +313,7 @@ export default function App() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      cancelled = true;
       window.clearInterval(interval);
       window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("beforeunload", markOffline);
