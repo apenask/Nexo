@@ -241,46 +241,69 @@ export default function App() {
   useEffect(() => {
     if (!session?.id) return;
 
-    const updatePresence = async () => {
-      const now = new Date().toISOString();
+    const updatePresence = async (isOnline = true) => {
+      const nowIso = new Date().toISOString();
+      const expiresAtIso = new Date(Date.now() + 90 * 1000).toISOString();
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ last_seen: now })
-        .eq("id", session.id);
+      const [{ error: profileError }, { error: presenceError }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .update({ last_seen: nowIso })
+          .eq("id", session.id),
+        supabase
+          .from("user_presence")
+          .upsert({
+            user_id: session.id,
+            is_online: isOnline,
+            last_seen: nowIso,
+            expires_at: isOnline ? expiresAtIso : nowIso,
+            updated_at: nowIso,
+          }, { onConflict: "user_id" }),
+      ]);
 
-      if (error) {
-        console.warn("Não foi possível atualizar last_seen:", error.message);
-        return;
+      if (profileError) {
+        console.warn("Não foi possível atualizar last_seen do profile:", profileError.message);
+      }
+
+      if (presenceError) {
+        console.warn("Não foi possível atualizar presença:", presenceError.message);
       }
 
       setProfile((current) =>
         current
           ? {
               ...current,
-              last_seen: now,
+              last_seen: nowIso,
             }
           : current
       );
     };
 
-    updatePresence();
+    const markOffline = () => {
+      updatePresence(false);
+    };
 
-    const interval = window.setInterval(updatePresence, 60000);
+    updatePresence(true);
+
+    const interval = window.setInterval(() => updatePresence(true), 30000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        updatePresence();
+        updatePresence(true);
+      } else {
+        markOffline();
       }
     };
 
-    window.addEventListener("focus", updatePresence);
+    window.addEventListener("focus", () => updatePresence(true));
+    window.addEventListener("beforeunload", markOffline);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", updatePresence);
+      window.removeEventListener("beforeunload", markOffline);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      markOffline();
     };
   }, [session?.id]);
 
