@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useProfile } from "../contexts/ProfileContext";
 import { useLanguage, Language } from "../contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Settings, Mail, ShieldCheck, Wallet, Save, Languages } from "lucide-react";
+import { Settings, Mail, ShieldCheck, Wallet, Save, Languages, Activity } from "lucide-react";
 import { toast } from "sonner";
 
 type CurrencyOption = "BRL" | "USD" | "EUR";
@@ -29,6 +29,11 @@ export function SettingsPage() {
   );
   const [isSaving, setIsSaving] = React.useState(false);
   const [showLanguagePrompt, setShowLanguagePrompt] = React.useState(false);
+
+  const isPresenceOnline = React.useMemo(() => {
+    if (!profile?.last_seen) return false;
+    return Date.now() - new Date(profile.last_seen).getTime() < 60_000;
+  }, [profile?.last_seen]);
 
   React.useEffect(() => {
     if (currency) {
@@ -122,6 +127,26 @@ export function SettingsPage() {
               </div>
               <p className="text-sm font-medium text-zinc-100">
                 {profile?.isAdmin ? t("settings.admin") : t("settings.user")}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Activity size={16} className={isPresenceOnline ? "text-emerald-400" : "text-zinc-500"} />
+                <span className="text-sm text-zinc-400">Status da presença</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                    isPresenceOnline ? "bg-emerald-400 shadow-[0_0_14px_rgba(74,222,128,0.8)]" : "bg-zinc-600"
+                  }`}
+                />
+                <p className="text-sm font-medium text-zinc-100">
+                  {isPresenceOnline ? "Online agora" : "Offline no momento"}
+                </p>
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                Essa luz acompanha a sua sessão ativa no navegador e também alimenta o painel admin.
               </p>
             </div>
           </CardContent>

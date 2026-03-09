@@ -71,12 +71,12 @@ export function AdminDashboard() {
       setRecentUsers((recentUsersRes.data ?? []) as RecentUserRow[]);
     }
 
-    const metricsRow: MetricsRow =
-      (metricsRes.data as unknown as MetricsRow) ?? {
-        total_users: 0,
-        online_users: 0,
-        offline_users: 0,
-      };
+    const rawMetrics = metricsRes.data as MetricsRow | MetricsRow[] | null;
+    const metricsRow = (Array.isArray(rawMetrics) ? rawMetrics[0] : rawMetrics) ?? {
+      total_users: 0,
+      online_users: 0,
+      offline_users: 0,
+    };
 
     setMetrics(metricsRow);
     setIsLoading(false);
@@ -103,7 +103,7 @@ export function AdminDashboard() {
 
     const interval = window.setInterval(() => {
       loadAdminData();
-    }, 10000);
+    }, 8000);
 
     return () => {
       window.clearInterval(interval);

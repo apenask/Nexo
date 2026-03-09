@@ -242,11 +242,21 @@ export default function App() {
     if (!session?.id) return;
 
     let cancelled = false;
+    let lastPresenceWrite = 0;
+    const PRESENCE_WINDOW_MS = 45 * 1000;
+    const HEARTBEAT_MS = 15 * 1000;
 
-    const updatePresence = async (isOnline = true) => {
+    const writePresence = async (isOnline = true, force = false) => {
       if (cancelled) return;
-      const nowIso = new Date().toISOString();
-      const expiresAtIso = new Date(Date.now() + 90 * 1000).toISOString();
+
+      const now = Date.now();
+      if (!force && isOnline && now - lastPresenceWrite < 8_000) {
+        return;
+      }
+
+      lastPresenceWrite = now;
+      const nowIso = new Date(now).toISOString();
+      const expiresAtIso = new Date(now + PRESENCE_WINDOW_MS).toISOString();
 
       const [{ error: profileError }, { error: presenceError }] = await Promise.all([
         supabase
@@ -255,13 +265,16 @@ export default function App() {
           .eq("id", session.id),
         supabase
           .from("user_presence")
-          .upsert({
-            user_id: session.id,
-            is_online: isOnline,
-            last_seen: nowIso,
-            expires_at: isOnline ? expiresAtIso : nowIso,
-            updated_at: nowIso,
-          }, { onConflict: "user_id" }),
+          .upsert(
+            {
+              user_id: session.id,
+              is_online: isOnline,
+              last_seen: nowIso,
+              expires_at: isOnline ? expiresAtIso : nowIso,
+              updated_at: nowIso,
+            },
+            { onConflict: "user_id" }
+          ),
       ]);
 
       if (profileError) {
@@ -282,8 +295,12 @@ export default function App() {
       );
     };
 
+    const markOnline = (force = false) => {
+      void writePresence(true, force);
+    };
+
     const markOffline = () => {
-      updatePresence(false);
+      void writePresence(false, true);
     };
 
     ensureUserProfile(session)
@@ -291,34 +308,46 @@ export default function App() {
         console.error("Erro ao garantir profile antes da presença:", error);
       })
       .finally(() => {
-        updatePresence(true);
+        markOnline(true);
       });
 
-    const interval = window.setInterval(() => updatePresence(true), 30000);
+    const heartbeat = window.setInterval(() => {
+      markOnline();
+    }, HEARTBEAT_MS);
+
+    const handleWindowFocus = () => {
+      markOnline(true);
+    };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        updatePresence(true);
-      } else {
-        markOffline();
+        markOnline(true);
       }
     };
 
-    const handleWindowFocus = () => {
-      updatePresence(true);
+    const activityHandler = () => {
+      markOnline();
     };
 
     window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("pointerdown", activityHandler, { passive: true });
+    window.addEventListener("keydown", activityHandler);
+    window.addEventListener("touchstart", activityHandler, { passive: true });
     window.addEventListener("beforeunload", markOffline);
+    window.addEventListener("pagehide", markOffline);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", handleWindowFocus);
-      window.removeEventListener("beforeunload", markOffline);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       markOffline();
+      cancelled = true;
+      window.clearInterval(heartbeat);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("pointerdown", activityHandler);
+      window.removeEventListener("keydown", activityHandler);
+      window.removeEventListener("touchstart", activityHandler);
+      window.removeEventListener("beforeunload", markOffline);
+      window.removeEventListener("pagehide", markOffline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [session?.id]);
 
