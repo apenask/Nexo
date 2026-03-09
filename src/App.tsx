@@ -295,12 +295,17 @@ export default function App() {
       }
     };
 
-    window.addEventListener("focus", () => updatePresence(true));
+    const handleWindowFocus = () => {
+      updatePresence(true);
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
     window.addEventListener("beforeunload", markOffline);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearInterval(interval);
+      window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("beforeunload", markOffline);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       markOffline();

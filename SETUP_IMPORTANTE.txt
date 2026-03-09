@@ -1,0 +1,15 @@
+NEXO - PASSOS IMPORTANTES PARA O NOVO FLUXO DE CADASTRO
+
+1) No Supabase, desative a confirmação de e-mail:
+   Authentication > Providers > Email > Confirm email = OFF
+
+2) Rode o arquivo SUPABASE_ADMIN_SETUP.sql para manter o painel ADM e a presença online/offline.
+
+3) Depois disso, o fluxo fica assim:
+   - usuário cria conta com e-mail e senha
+   - a sessão já é criada automaticamente
+   - o usuário entra direto no sistema
+   - o painel ADM consegue contar cadastro e presença
+
+4) Se a confirmação de e-mail continuar ligada, o cadastro pode até acontecer,
+   mas o login automático pode não entrar na hora.
