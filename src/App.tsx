@@ -35,15 +35,16 @@ import {
 } from "./types";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import { parseLocalDate } from "./lib/utils";
 
 type DbProfile = {
   id: string;
   email: string | null;
   created_at: string | null;
   last_login: string | null;
+  last_seen?: string | null;
   preferred_currency: string | null;
   role: string | null;
+  is_admin?: boolean | null;
 };
 
 type DbCategory = {
@@ -98,13 +99,17 @@ type DbTransaction = {
 };
 
 function mapProfile(db: DbProfile): Profile {
+  const isAdmin = Boolean(db.is_admin) || db.role === "admin";
+
   return {
     id: db.id,
     email: db.email ?? "",
     created_at: db.created_at ?? new Date().toISOString(),
     last_login: db.last_login,
     preferred_currency: db.preferred_currency ?? "BRL",
-    role: (db.role as "user" | "admin") ?? "user",
+    role: isAdmin ? "admin" : "user",
+    isAdmin,
+    last_seen: db.last_seen ?? null,
   };
 }
 
@@ -113,6 +118,7 @@ function mapCategory(db: DbCategory): Category {
     id: db.id,
     name: db.name,
     color: db.color ?? "#22c55e",
+    budgetPercentage: Number(db.budget_percentage ?? 0),
   };
 }
 
@@ -232,6 +238,52 @@ export default function App() {
     });
   }, [session?.id]);
 
+  useEffect(() => {
+    if (!session?.id) return;
+
+    const updatePresence = async () => {
+      const now = new Date().toISOString();
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ last_seen: now })
+        .eq("id", session.id);
+
+      if (error) {
+        console.warn("Não foi possível atualizar last_seen:", error.message);
+        return;
+      }
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              last_seen: now,
+            }
+          : current
+      );
+    };
+
+    updatePresence();
+
+    const interval = window.setInterval(updatePresence, 60000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        updatePresence();
+      }
+    };
+
+    window.addEventListener("focus", updatePresence);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", updatePresence);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [session?.id]);
+
   const syncAll = async (user: User) => {
     await ensureUserProfile(user);
     await loadUserData(user.id);
@@ -256,8 +308,10 @@ export default function App() {
         email: user.email ?? "",
         created_at: now,
         last_login: now,
+        last_seen: now,
         preferred_currency: "BRL",
         role: "user",
+        is_admin: false,
       };
 
       const { error: insertError } = await supabase.from("profiles").insert(newProfile);
@@ -271,6 +325,8 @@ export default function App() {
           last_login: now,
           preferred_currency: "BRL",
           role: "user",
+          isAdmin: false,
+          last_seen: now,
         });
         return;
       }
@@ -284,6 +340,7 @@ export default function App() {
       .update({
         email: user.email ?? existingProfile.email,
         last_login: now,
+        last_seen: now,
       })
       .eq("id", user.id);
 
@@ -296,6 +353,7 @@ export default function App() {
         ...existingProfile,
         email: user.email ?? existingProfile.email,
         last_login: now,
+        last_seen: now,
       })
     );
   };
@@ -466,7 +524,7 @@ export default function App() {
         user_id: session.id,
         name: newCat.name,
         color: newCat.color,
-        budget_percentage: 0,
+        budget_percentage: newCat.budgetPercentage ?? 0,
       };
 
       const { data, error } = await supabase
@@ -490,7 +548,7 @@ export default function App() {
       const payload = {
         name: updatedCategory.name,
         color: updatedCategory.color,
-        budget_percentage: 0,
+        budget_percentage: updatedCategory.budgetPercentage ?? 0,
       };
 
       const { data, error } = await supabase
@@ -739,7 +797,7 @@ export default function App() {
         ) {
           const exists = transactions.some((t) => {
             if (t.recurringTransactionId !== rt.id) return false;
-            const tDate = parseLocalDate(t.date);
+            const tDate = new Date(t.date);
 
             if (rt.recurrenceType === "mensal" || rt.recurrenceType === "anual") {
               return (
@@ -773,7 +831,7 @@ export default function App() {
   const allTransactions = useMemo(
     () =>
       [...transactions, ...getProjectedTransactions()].sort(
-        (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       ),
     [transactions, recurringTransactions]
   );
@@ -885,7 +943,7 @@ export default function App() {
         return <SettingsPage />;
 
       case "admin":
-        return profile?.role === "admin" ? <AdminDashboard /> : dashboardFallback;
+        return profile?.isAdmin ? <AdminDashboard /> : dashboardFallback;
 
       default:
         return dashboardFallback;

@@ -10,7 +10,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { Transaction, Category, Card as CardType } from "../types";
-import { formatCurrency, formatDate, parseLocalDate } from "../lib/utils";
+import { formatCurrency } from "../lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { MonthSelector } from "../components/MonthSelector";
 import { useProfile } from "../contexts/ProfileContext";
@@ -98,14 +98,14 @@ export function PlannedExpensesPage({
 
   const plannedTransactions = [...transactions]
     .filter((tx) => {
-      const date = parseLocalDate(tx.date);
+      const date = new Date(tx.date);
       return (
         tx.isPlanned &&
         date.getMonth() === currentMonth &&
         date.getFullYear() === currentYear
       );
     })
-    .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const projectedImpact = plannedTransactions.reduce((acc, tx) => {
     return tx.type === "entrada" ? acc + tx.amount : acc - tx.amount;
@@ -208,7 +208,7 @@ export function PlannedExpensesPage({
                           <span>•</span>
 
                           <span>
-                            {text.date}: {formatDate(tx.date, language)}
+                            {text.date}: {new Date(tx.date).toLocaleDateString(language)}
                           </span>
 
                           {cardName && (

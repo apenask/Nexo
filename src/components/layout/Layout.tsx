@@ -43,7 +43,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           reports: "Reports",
           settings: "Settings",
           logout: "Sign out",
-          dev: "Dev",
+          dev: "Admin",
         };
       case "es-ES":
         return {
@@ -56,7 +56,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           reports: "Informes",
           settings: "Configuración",
           logout: "Cerrar sesión",
-          dev: "Dev",
+          dev: "Admin",
         };
       case "pt-BR":
       default:
@@ -70,7 +70,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           reports: "Relatórios",
           settings: "Configurações",
           logout: "Sair da conta",
-          dev: "Dev",
+          dev: "Admin",
         };
     }
   }, [language]);
@@ -169,7 +169,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
         </nav>
 
         <div className="p-4 mt-auto border-t border-zinc-800/50 flex flex-col gap-2">
-          {profile?.role === "admin" && (
+          {profile?.isAdmin && (
             <button
               onClick={() => {
                 setActiveTab("admin");

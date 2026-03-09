@@ -9,7 +9,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { Category, Transaction } from "../types";
-import { formatCurrency, parseLocalDate } from "../lib/utils";
+import { formatCurrency } from "../lib/utils";
 import { useProfile } from "../contexts/ProfileContext";
 import { useLanguage } from "../contexts/LanguageContext";
 
@@ -39,13 +39,12 @@ export function CategoriesPage({
           subtitle: "Organize your finances by category and track spending better.",
           addCategory: "New category",
           noCategories: "No categories found yet.",
-          spendingShare: "Share of spending",
+          budgetPercentage: "Budget percentage",
           spent: "Spent",
           edit: "Edit",
           delete: "Delete",
           uncategorized: "Uncategorized",
           usage: "Usage",
-          thisMonth: "This month",
         };
       case "es-ES":
         return {
@@ -53,13 +52,12 @@ export function CategoriesPage({
           subtitle: "Organiza tus finanzas por categoría y acompaña mejor tus gastos.",
           addCategory: "Nueva categoría",
           noCategories: "Todavía no se encontraron categorías.",
-          spendingShare: "Participación en los gastos",
+          budgetPercentage: "Porcentaje de presupuesto",
           spent: "Gastado",
           edit: "Editar",
           delete: "Eliminar",
           uncategorized: "Sin categoría",
           usage: "Uso",
-          thisMonth: "Este mes",
         };
       default:
         return {
@@ -67,43 +65,28 @@ export function CategoriesPage({
           subtitle: "Organize suas finanças por categoria e acompanhe melhor seus gastos.",
           addCategory: "Nova categoria",
           noCategories: "Nenhuma categoria encontrada ainda.",
-          spendingShare: "Participação nos gastos",
+          budgetPercentage: "Orçamento percentual",
           spent: "Gasto",
           edit: "Editar",
           delete: "Apagar",
           uncategorized: "Sem categoria",
           usage: "Uso",
-          thisMonth: "Este mês",
         };
     }
   }, [language]);
-
-  const currentMonthKey = React.useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
 
   const expensesByCategory = React.useMemo(() => {
     const totals = new Map<string, number>();
 
     transactions
-      .filter((tx) => {
-        if (tx.type !== "saida" || tx.isPlanned) return false;
-        const date = parseLocalDate(tx.date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        return monthKey === currentMonthKey;
-      })
+      .filter((tx) => tx.type === "saida" && !tx.isPlanned)
       .forEach((tx) => {
         const key = tx.categoryId || "uncategorized";
         totals.set(key, (totals.get(key) || 0) + tx.amount);
       });
 
     return totals;
-  }, [transactions, currentMonthKey]);
-
-  const totalExpenses = React.useMemo(() => {
-    return Array.from(expensesByCategory.values()).reduce((sum, value) => sum + value, 0);
-  }, [expensesByCategory]);
+  }, [transactions]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -135,8 +118,9 @@ export function CategoriesPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {categories.map((category) => {
             const spent = expensesByCategory.get(category.id) || 0;
+            const budgetPercentage = Number(category.budgetPercentage ?? 0);
             const color = category.color ?? "#22c55e";
-            const spendingPercentage = totalExpenses > 0 ? (spent / totalExpenses) * 100 : 0;
+            const usagePercent = Math.min(spent > 0 && budgetPercentage > 0 ? 100 : 0, 100);
 
             return (
               <div
@@ -182,12 +166,11 @@ export function CategoriesPage({
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
                         <Percent size={14} />
-                        <span>{text.spendingShare}</span>
+                        <span>{text.budgetPercentage}</span>
                       </div>
                       <p className="text-xl font-semibold text-zinc-100">
-                        {spendingPercentage.toFixed(0)}%
+                        {budgetPercentage.toFixed(0)}%
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500">{text.thisMonth}</p>
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -198,7 +181,6 @@ export function CategoriesPage({
                       <p className="text-xl font-semibold text-zinc-100">
                         {formatCurrency(spent, currency)}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500">{text.thisMonth}</p>
                     </div>
                   </div>
 
@@ -207,7 +189,7 @@ export function CategoriesPage({
                       <div>
                         <p className="text-sm text-zinc-400">{text.usage}</p>
                         <p className="mt-1 text-lg font-semibold text-zinc-100">
-                          {spendingPercentage.toFixed(0)}%
+                          {budgetPercentage.toFixed(0)}%
                         </p>
                       </div>
 
@@ -223,7 +205,7 @@ export function CategoriesPage({
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${Math.min(spendingPercentage, 100)}%`,
+                          width: `${usagePercent}%`,
                           background: `linear-gradient(90deg, ${color} 0%, rgba(255,255,255,0.92) 100%)`,
                         }}
                       />
@@ -231,7 +213,7 @@ export function CategoriesPage({
 
                     <div className="mt-3 flex items-center justify-between text-xs text-zinc-400">
                       <span>0%</span>
-                      <span>{spendingPercentage.toFixed(0)}%</span>
+                      <span>{budgetPercentage.toFixed(0)}%</span>
                     </div>
                   </div>
                 </div>
@@ -251,31 +233,15 @@ export function CategoriesPage({
                   </h3>
                 </div>
 
-                <div className="p-6 space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
-                        <Percent size={14} />
-                        <span>{text.spendingShare}</span>
-                      </div>
-                      <p className="text-xl font-semibold text-zinc-100">
-                        {totalExpenses > 0
-                          ? (((expensesByCategory.get("uncategorized") || 0) / totalExpenses) * 100).toFixed(0)
-                          : 0}%
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500">{text.thisMonth}</p>
+                <div className="p-6">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
+                      <Wallet size={14} />
+                      <span>{text.spent}</span>
                     </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
-                        <Wallet size={14} />
-                        <span>{text.spent}</span>
-                      </div>
-                      <p className="text-xl font-semibold text-zinc-100">
-                        {formatCurrency(expensesByCategory.get("uncategorized") || 0, currency)}
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500">{text.thisMonth}</p>
-                    </div>
+                    <p className="text-xl font-semibold text-zinc-100">
+                      {formatCurrency(expensesByCategory.get("uncategorized") || 0, currency)}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -121,7 +121,7 @@ export function SettingsPage() {
                 <span className="text-sm text-zinc-400">{t("settings.accountType")}</span>
               </div>
               <p className="text-sm font-medium text-zinc-100">
-                {profile?.role === "admin" ? t("settings.admin") : t("settings.user")}
+                {profile?.isAdmin ? t("settings.admin") : t("settings.user")}
               </p>
             </div>
           </CardContent>

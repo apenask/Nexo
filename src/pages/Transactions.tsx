@@ -10,7 +10,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { Transaction, Category, Card as CardType } from "../types";
-import { formatCurrency, formatDate, parseLocalDate } from "../lib/utils";
+import { formatCurrency } from "../lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { MonthSelector } from "../components/MonthSelector";
 import { useProfile } from "../contexts/ProfileContext";
@@ -95,10 +95,10 @@ export function TransactionsPage({
 
   const monthTransactions = [...transactions]
     .filter((tx) => {
-      const date = parseLocalDate(tx.date);
+      const date = new Date(tx.date);
       return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     })
-    .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const getCategoryName = (categoryId?: string) => {
     return categories.find((c) => c.id === categoryId)?.name || "-";
@@ -180,7 +180,7 @@ export function TransactionsPage({
                           <span>•</span>
 
                           <span>
-                            {text.date}: {formatDate(tx.date, language)}
+                            {text.date}: {new Date(tx.date).toLocaleDateString(language)}
                           </span>
 
                           {cardName && (
