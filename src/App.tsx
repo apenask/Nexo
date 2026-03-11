@@ -27,6 +27,9 @@ import { AddCategoryModal } from "./components/AddCategoryModal";
 import { AddCardModal } from "./components/AddCardModal";
 import { AddRecurringModal } from "./components/AddRecurringModal";
 
+import { ChallengesPage } from "./pages/ChallengesPage";
+import { FriendsPlannerPage } from "./pages/FriendsPlannerPage";
+
 import {
   Transaction,
   Category,
@@ -35,6 +38,8 @@ import {
   Profile,
   Goal,
   GoalContribution,
+  FinancialChallenge,
+  FriendsEvent,
 } from "./types";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -213,6 +218,25 @@ function mapGoalContribution(db: DbGoalContribution): GoalContribution {
 }
 
 export default function App() {
+
+  const [challenges, setChallenges] = useState<FinancialChallenge[]>(() => {
+    try {
+      const saved = localStorage.getItem("nexo-challenges");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [friendsEvents, setFriendsEvents] = useState<FriendsEvent[]>(() => {
+    try {
+      const saved = localStorage.getItem("nexo-friends-events");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [session, setSession] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isBooting, setIsBooting] = useState(true);
@@ -239,6 +263,14 @@ export default function App() {
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [isAddCardModalOpen, setIsAddCardModalOpen] = useState(false);
   const [isAddRecurringModalOpen, setIsAddRecurringModalOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("nexo-challenges", JSON.stringify(challenges));
+  }, [challenges]);
+
+  useEffect(() => {
+    localStorage.setItem("nexo-friends-events", JSON.stringify(friendsEvents));
+  }, [friendsEvents]);
 
   useEffect(() => {
     let mounted = true;
@@ -945,14 +977,28 @@ export default function App() {
     setIsAddModalOpen(true);
   };
 
-  const handleAddGoal = async (goal: Omit<Goal, "id" | "currentAmount" | "created_at">) => {
+    const handleAddGoal = async (
+    goal: Omit<Goal, "id" | "currentAmount" | "created_at">
+  ) => {
     if (!session?.id) return;
 
     try {
+      const parsedTargetAmount = Number(goal.targetAmount);
+
+      if (!goal.name?.trim()) {
+        toast.error("Informe o nome da meta.");
+        return;
+      }
+
+      if (!Number.isFinite(parsedTargetAmount) || parsedTargetAmount <= 0) {
+        toast.error("Informe um valor válido para a meta.");
+        return;
+      }
+
       const payload = {
         user_id: session.id,
-        name: goal.name,
-        target_amount: goal.targetAmount,
+        name: goal.name.trim(),
+        target_amount: parsedTargetAmount,
         current_amount: 0,
         target_date: goal.targetDate || null,
       };
@@ -963,25 +1009,52 @@ export default function App() {
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro detalhado ao criar meta:", error);
+        toast.error(error.message || "Erro ao criar meta.");
+        return;
+      }
 
-      setGoals((prev) => [mapGoal(data as DbGoal), ...prev]);
+      if (data) {
+        setGoals((prev) => [mapGoal(data as DbGoal), ...prev]);
+      } else {
+        await syncAll(session.id);
+      }
+
       toast.success("Meta criada com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao criar meta:", error);
-      toast.error("Erro ao criar meta.");
+      toast.error(error?.message || "Erro ao criar meta.");
     }
   };
 
-  const handleAddGoalContribution = async (goalId: string, amount: number, contributionDate?: string, notes?: string) => {
+    const handleAddGoalContribution = async (
+    goalId: string,
+    amount: number,
+    contributionDate?: string,
+    notes?: string
+  ) => {
     if (!session?.id) return;
 
     try {
+      const parsedAmount = Number(amount);
+
+      if (!goalId) {
+        toast.error("Meta inválida.");
+        return;
+      }
+
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        toast.error("Informe um valor válido.");
+        return;
+      }
+
       const payload = {
         user_id: session.id,
         goal_id: goalId,
-        amount,
-        contribution_date: contributionDate || new Date().toISOString().split("T")[0],
+        amount: parsedAmount,
+        contribution_date:
+          contributionDate || new Date().toISOString().split("T")[0],
         notes: notes || null,
       };
 
@@ -991,20 +1064,24 @@ export default function App() {
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro detalhado ao adicionar valor à meta:", error);
+        toast.error(error.message || "Erro ao adicionar valor à meta.");
+        return;
+      }
 
-      setGoalContributions((prev) => [mapGoalContribution(data as DbGoalContribution), ...prev]);
-      setGoals((prev) =>
-        prev.map((goal) =>
-          goal.id === goalId
-            ? { ...goal, currentAmount: Number(goal.currentAmount ?? 0) + Number(amount) }
-            : goal
-        )
-      );
+      if (data) {
+        setGoalContributions((prev) => [
+          mapGoalContribution(data as DbGoalContribution),
+          ...prev,
+        ]);
+      }
+
+      await syncAll(session.id);
       toast.success("Valor adicionado à meta!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar valor à meta:", error);
-      toast.error("Erro ao adicionar valor à meta.");
+      toast.error(error?.message || "Erro ao adicionar valor à meta.");
     }
   };
 
@@ -1020,6 +1097,128 @@ export default function App() {
       console.error("Erro ao remover meta:", error);
       toast.error("Erro ao remover meta.");
     }
+  };
+
+    const handleAddChallenge = (
+    challenge: Omit<FinancialChallenge, "id" | "created_at" | "currentAmount">
+  ) => {
+    const item: FinancialChallenge = {
+      id: crypto.randomUUID(),
+      title: challenge.title,
+      description: challenge.description,
+      targetAmount: Number(challenge.targetAmount || 0),
+      currentAmount: 0,
+      startDate: challenge.startDate,
+      endDate: challenge.endDate,
+      created_at: new Date().toISOString(),
+    };
+
+    setChallenges((prev) => [item, ...prev]);
+    toast.success("Desafio criado com sucesso!");
+  };
+
+  const handleAddChallengeProgress = (challengeId: string, value: number) => {
+    setChallenges((prev) =>
+      prev.map((item) =>
+        item.id === challengeId
+          ? {
+              ...item,
+              currentAmount: Number(item.currentAmount || 0) + Number(value || 0),
+            }
+          : item
+      )
+    );
+
+    toast.success("Progresso do desafio atualizado!");
+  };
+
+  const handleDeleteChallenge = (challengeId: string) => {
+    setChallenges((prev) => prev.filter((item) => item.id !== challengeId));
+    toast.success("Desafio removido.");
+  };
+
+  const handleAddFriendsEvent = (
+    event: Omit<FriendsEvent, "id" | "items" | "created_at">
+  ) => {
+    const item: FriendsEvent = {
+      id: crypto.randomUUID(),
+      title: event.title,
+      eventDate: event.eventDate,
+      location: event.location,
+      description: event.description,
+      items: [],
+      created_at: new Date().toISOString(),
+    };
+
+    setFriendsEvents((prev) => [item, ...prev]);
+    toast.success("Evento criado com sucesso!");
+  };
+
+  const handleDeleteFriendsEvent = (eventId: string) => {
+    setFriendsEvents((prev) => prev.filter((item) => item.id !== eventId));
+    toast.success("Evento removido.");
+  };
+
+  const handleAddFriendsEventItem = (
+    eventId: string,
+    label: string,
+    assignedTo: string
+  ) => {
+    setFriendsEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              items: [
+                ...event.items,
+                {
+                  id: crypto.randomUUID(),
+                  label,
+                  assignedTo,
+                  status: "pendente",
+                },
+              ],
+            }
+          : event
+      )
+    );
+
+    toast.success("Item adicionado ao evento!");
+  };
+
+  const handleToggleFriendsEventItem = (eventId: string, itemId: string) => {
+    setFriendsEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              items: event.items.map((item) =>
+                item.id === itemId
+                  ? {
+                      ...item,
+                      status: item.status === "ok" ? "pendente" : "ok",
+                    }
+                  : item
+              ),
+            }
+          : event
+      )
+    );
+  };
+
+  const handleDeleteFriendsEventItem = (eventId: string, itemId: string) => {
+    setFriendsEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              items: event.items.filter((item) => item.id !== itemId),
+            }
+          : event
+      )
+    );
+
+    toast.success("Item removido.");
   };
 
   const getProjectedTransactions = (): Transaction[] => {
@@ -1108,6 +1307,29 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
+
+      case "challenges":
+        return (
+          <ChallengesPage
+            challenges={challenges}
+            onAddChallenge={handleAddChallenge}
+            onAddProgress={handleAddChallengeProgress}
+            onDeleteChallenge={handleDeleteChallenge}
+          />
+        );
+
+      case "friends-planner":
+        return (
+          <FriendsPlannerPage
+            events={friendsEvents}
+            onAddEvent={handleAddFriendsEvent}
+            onDeleteEvent={handleDeleteFriendsEvent}
+            onAddItem={handleAddFriendsEventItem}
+            onToggleItem={handleToggleFriendsEventItem}
+            onDeleteItem={handleDeleteFriendsEventItem}
+          />
+        );
+
       case "dashboard":
         return dashboardFallback;
 

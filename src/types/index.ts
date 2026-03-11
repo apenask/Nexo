@@ -4,7 +4,7 @@ export interface Profile {
   created_at: string;
   last_login: string | null;
   preferred_currency: string;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
   isAdmin: boolean;
   last_seen?: string | null;
 }
@@ -24,8 +24,9 @@ export interface Card {
   id: string;
   name: string;
   color?: string;
-  closingDate: number; // Day of the month (1-31)
-  dueDate: number; // Day of the month (1-31)
+  closingDate: number;
+  dueDate: number;
+  limit?: number;
 }
 
 export interface RecurringTransaction {
@@ -35,7 +36,7 @@ export interface RecurringTransaction {
   description: string;
   categoryId: string;
   recurrenceType: RecurrenceType;
-  startDate: string; // ISO string
+  startDate: string;
   status: "active" | "paused";
   notes?: string;
 }
@@ -44,16 +45,16 @@ export interface Transaction {
   id: string;
   type: TransactionType;
   amount: number;
-  date: string; // ISO string
+  date: string;
   description: string;
   categoryId: string;
   notes?: string;
   isPlanned?: boolean;
-  cardId?: string; // If it's a card transaction
-  installmentIndex?: number; // e.g., 1 for 1/3
-  installmentCount?: number; // e.g., 3 for 1/3
-  installmentGroupId?: string; // To group installments together
-  recurringTransactionId?: string; // If generated from a recurring transaction
+  cardId?: string;
+  installmentIndex?: number;
+  installmentCount?: number;
+  installmentGroupId?: string;
+  recurringTransactionId?: string;
 }
 
 export interface DailyBalance {
@@ -79,5 +80,34 @@ export interface GoalContribution {
   amount: number;
   contributionDate: string;
   notes?: string;
+  created_at?: string | null;
+}
+
+export interface FinancialChallenge {
+  id: string;
+  title: string;
+  description?: string;
+  targetAmount: number;
+  currentAmount: number;
+  startDate: string;
+  endDate: string;
+  created_at?: string | null;
+}
+
+export interface FriendsEventItem {
+  id: string;
+  label: string;
+  assignedTo: string;
+  status: "pendente" | "ok";
+  notes?: string;
+}
+
+export interface FriendsEvent {
+  id: string;
+  title: string;
+  eventDate: string;
+  location?: string;
+  description?: string;
+  items: FriendsEventItem[];
   created_at?: string | null;
 }

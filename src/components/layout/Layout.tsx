@@ -13,6 +13,8 @@ import {
   Settings,
   ShieldAlert,
   Target,
+  Trophy,
+  Users,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { supabase } from "../../lib/supabase";
@@ -43,6 +45,8 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           cards: "Cards",
           reports: "Reports",
           goals: "Goals",
+          challenges: "Challenges",
+          planner: "With friends",
           settings: "Settings",
           logout: "Sign out",
           dev: "Admin",
@@ -57,6 +61,8 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           cards: "Tarjetas",
           reports: "Informes",
           goals: "Metas",
+          challenges: "Desafíos",
+          planner: "Con amigos",
           settings: "Configuración",
           logout: "Cerrar sesión",
           dev: "Admin",
@@ -72,6 +78,8 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           cards: "Cartões",
           reports: "Relatórios",
           goals: "Metas",
+          challenges: "Desafios",
+          planner: "Com amigos",
           settings: "Configurações",
           logout: "Sair da conta",
           dev: "Admin",
@@ -88,6 +96,8 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
     { id: "cards", label: text.cards, icon: CreditCard },
     { id: "reports", label: text.reports, icon: BarChart3 },
     { id: "goals", label: text.goals, icon: Target },
+    { id: "challenges", label: text.challenges, icon: Trophy },
+    { id: "friends-planner", label: text.planner, icon: Users },
   ];
 
   const handleLogout = async () => {
@@ -115,7 +125,6 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center">
@@ -131,7 +140,6 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
         </button>
       </div>
 
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed left-0 top-[72px] bottom-0 z-40 w-64 border-r border-zinc-800/50 bg-zinc-950/95 backdrop-blur-xl transform transition-transform duration-300 ease-in-out md:relative md:top-0 md:bottom-auto md:translate-x-0 flex flex-col",
@@ -189,7 +197,9 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
             >
               <ShieldAlert
                 size={18}
-                className={cn(activeTab === "admin" ? "text-zinc-50" : "text-zinc-500")}
+                className={cn(
+                  activeTab === "admin" ? "text-zinc-50" : "text-zinc-500"
+                )}
               />
               {text.dev}
             </button>
@@ -209,7 +219,9 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           >
             <Settings
               size={18}
-              className={cn(activeTab === "settings" ? "text-zinc-50" : "text-zinc-500")}
+              className={cn(
+                activeTab === "settings" ? "text-zinc-50" : "text-zinc-500"
+              )}
             />
             {text.settings}
           </button>
@@ -224,12 +236,10 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto w-full pb-6 md:pb-0">
         <div className="max-w-5xl mx-auto p-4 md:p-8">{children}</div>
       </main>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
